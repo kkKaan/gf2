@@ -1,0 +1,91 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "binpy"
+version = "0.1.0"
+description = "High-performance binary (GF(2)) matrix operations for Python"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+  { name = "binpy authors" }
+]
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.23",
+]
+keywords = ["binary", "GF(2)", "matrix", "linear algebra", "sparse", "bitwise", "LDPC", "coding theory" ]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Mathematics",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "hypothesis>=6.90",
+]
+dev = [
+  "ruff>=0.5",
+  "mypy>=1.10", 
+  "pre-commit>=3.7",
+]
+docs = [
+  "mkdocs>=1.5",
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.25",
+]
+
+[project.urls]
+Homepage = "https://github.com/kkkaan/binpy"
+Source = "https://github.com/kkkaan/binpy"
+Issues = "https://github.com/kkkaan/binpy/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["binpy"]
+
+[tool.pytest.ini_options]
+addopts = "-q --cov=binpy --cov-report=term-missing"
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 110
+target-version = "py39"
+indent-width = 4
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "I", "UP", "B", "SIM", "PIE", "TCH",
+]
+ignore = [
+  "E203",  # whitespace before ':' (Black/ruff-format compatibility)
+]
+
+# Per-file ignores for math library patterns
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F403", "F405"]  # Allow star imports in package init
+
+[tool.ruff.format]
+quote-style = "double"              # Google prefers double quotes
+indent-style = "space"              
+skip-magic-trailing-comma = false   # Keep trailing commas (YAPF compatible)
+line-ending = "lf"
+docstring-code-format = true        # Format code blocks in docstrings
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-single-line = false
+split-on-trailing-comma = true
+
+
