@@ -23,7 +23,7 @@ jobs:
           ruff check .
           ruff format --check .
       - name: Type check
-        run: mypy src/binpy
+        run: mypy binpy
       - name: Test
         run: pytest -q
 
