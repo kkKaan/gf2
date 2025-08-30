@@ -441,7 +441,12 @@ def condition_analysis(A: SparseGF2Matrix | DenseGF2Matrix) -> dict:
     analysis["nullity"] = len(null_basis)
 
     # Verify rank-nullity theorem
-    analysis["rank_nullity_check"] = analysis["rank"] + analysis["nullity"] == A.cols
+    rank_val = analysis["rank"]
+    nullity_val = analysis["nullity"]
+    if rank_val is not None and nullity_val is not None:
+        analysis["rank_nullity_check"] = rank_val + nullity_val == A.cols
+    else:
+        analysis["rank_nullity_check"] = False
 
     return analysis
 

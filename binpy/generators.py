@@ -293,8 +293,8 @@ def _ldpc_structured(m: int, n: int, row_weight: int, col_weight: int) -> Sparse
 def _ldpc_progressive_edge_growth(m: int, n: int, row_weight: int, col_weight: int) -> SparseGF2Matrix:
     """Generate LDPC using Progressive Edge Growth algorithm."""
     # Simplified PEG algorithm
-    coordinates = []
-    adjacency = [[] for _ in range(n)]  # Variable node adjacencies
+    coordinates: list[tuple[int, int]] = []
+    adjacency: list[list[int]] = [[] for _ in range(n)]  # Variable node adjacencies
 
     for j in range(n):  # For each variable node
         for _ in range(col_weight):
@@ -506,7 +506,7 @@ def hypergraph_product(H1: SparseGF2Matrix, H2: SparseGF2Matrix) -> tuple[Sparse
                     x_coordinates.append((row_idx, col_idx))
 
     # Similar construction for H_z (with roles swapped)
-    z_coordinates = []
+    z_coordinates: list[tuple[int, int]] = []
     # Implementation similar to above but with H1 and H2 roles swapped
 
     H_x = create_sparse_matrix(m1 * m2, total_qubits, coordinates=x_coordinates)

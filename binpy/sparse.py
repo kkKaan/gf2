@@ -14,8 +14,12 @@ Storage Formats:
 """
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 @dataclass
@@ -55,10 +59,11 @@ class SparseGF2Matrix:
         self.format = "empty"
 
         # Storage arrays (only one will be used based on format)
-        self.csr_row_ptr = None
-        self.csr_col_ind = None
-        self.bitpacked_rows = None
-        self.structured_params = None
+        # Annotate as Optional so static type checker knows possible types
+        self.csr_row_ptr: Sequence[int] | np.ndarray | None = None
+        self.csr_col_ind: Sequence[int] | np.ndarray | None = None
+        self.bitpacked_rows: np.ndarray | None = None
+        self.structured_params: dict | None = None
 
         if data is not None:
             self._load_data(data, format_hint)
@@ -195,6 +200,8 @@ class SparseGF2Matrix:
         """
         if self.format == "bitpacked":
             # Already bit-packed, just need to combine words
+            if self.bitpacked_rows is None:
+                raise ValueError("Bitpacked rows not initialized")
             if self.cols <= 64:
                 return int(self.bitpacked_rows[row_idx, 0])
             else:
@@ -206,6 +213,8 @@ class SparseGF2Matrix:
 
         elif self.format in ["csr", "csr_compact"]:
             # Convert CSR row to packed integer
+            if self.csr_row_ptr is None or self.csr_col_ind is None:
+                raise ValueError("CSR format data not initialized")
             result = 0
             start = self.csr_row_ptr[row_idx]
             end = self.csr_row_ptr[row_idx + 1]
@@ -285,12 +294,23 @@ class SparseGF2Matrix:
         """Calculate memory usage statistics."""
         if self.format in ["csr", "csr_compact"]:
             # CSR: row_ptr + col_ind arrays
-            row_ptr_bytes = self.csr_row_ptr.nbytes
-            col_ind_bytes = self.csr_col_ind.nbytes
+            if self.csr_row_ptr is None or self.csr_col_ind is None:
+                raise ValueError("CSR format data not initialized")
+            # Handle both numpy arrays and sequences
+            if hasattr(self.csr_row_ptr, "nbytes"):
+                row_ptr_bytes = self.csr_row_ptr.nbytes
+            else:
+                row_ptr_bytes = len(self.csr_row_ptr) * 4  # Assume 32-bit ints
+            if hasattr(self.csr_col_ind, "nbytes"):
+                col_ind_bytes = self.csr_col_ind.nbytes
+            else:
+                col_ind_bytes = len(self.csr_col_ind) * 4  # Assume 32-bit ints
             total_bytes = row_ptr_bytes + col_ind_bytes
 
         elif self.format == "bitpacked":
             # Bit-packed: just the packed array
+            if self.bitpacked_rows is None:
+                raise ValueError("Bitpacked rows not initialized")
             total_bytes = self.bitpacked_rows.nbytes
 
         else:
@@ -327,11 +347,15 @@ class SparseGF2Matrix:
     def get_bit(self, row: int, col: int) -> int:
         """Get bit at (row, col)."""
         if self.format == "bitpacked":
+            if self.bitpacked_rows is None:
+                raise ValueError("Bitpacked rows not initialized")
             word_idx = col // 64
             bit_idx = col % 64
             return int((self.bitpacked_rows[row, word_idx] >> bit_idx) & 1)
         elif self.format in ["csr", "csr_compact"]:
             # Check if bit is set in CSR format
+            if self.csr_row_ptr is None or self.csr_col_ind is None:
+                raise ValueError("CSR format data not initialized")
             start = self.csr_row_ptr[row]
             end = self.csr_row_ptr[row + 1]
             for idx in range(start, end):

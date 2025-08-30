@@ -357,15 +357,15 @@ def matrix_power(A: SparseGF2Matrix | DenseGF2Matrix, k: int) -> SparseGF2Matrix
         # Return identity matrix
         n = A.rows
         identity_rows = [(1 << i) for i in range(n)]
-        result = SparseGF2Matrix(n, n)
-        result.set_from_packed_rows(identity_rows)
-        return result
+        identity_result = SparseGF2Matrix(n, n)
+        identity_result.set_from_packed_rows(identity_rows)
+        return identity_result
 
     if k == 1:
         return A
 
     # Fast exponentiation
-    result = matrix_power(A, k // 2)
+    result: SparseGF2Matrix | DenseGF2Matrix = matrix_power(A, k // 2)
     result = multiply(result, result)
 
     if k % 2 == 1:
@@ -444,7 +444,7 @@ def _test_polynomial(A: SparseGF2Matrix | DenseGF2Matrix, coeffs: list[int]) -> 
     degree = len(coeffs) - 1
 
     # Compute p(A) = c0*I + c1*A + c2*A^2 + ... + cd*A^d
-    result = SparseGF2Matrix(n, n)  # Zero matrix
+    result: SparseGF2Matrix | DenseGF2Matrix = SparseGF2Matrix(n, n)  # Zero matrix
 
     # Identity matrix for c0 term
     if coeffs[0]:
@@ -454,7 +454,7 @@ def _test_polynomial(A: SparseGF2Matrix | DenseGF2Matrix, coeffs: list[int]) -> 
         result = add(result, identity)
 
     # Powers of A
-    A_power = A
+    A_power: SparseGF2Matrix | DenseGF2Matrix = A
     for i in range(1, degree + 1):
         if coeffs[i]:
             # Add ci * A^i
