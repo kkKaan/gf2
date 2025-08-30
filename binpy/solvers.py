@@ -16,7 +16,6 @@ Solvers:
 """
 
 import time
-from typing import Optional, Union
 
 import numpy as np
 
@@ -24,7 +23,7 @@ from .core import gaussian_elimination_inplace
 from .sparse import DenseGF2Matrix, SparseGF2Matrix
 
 
-def solve(A: Union[SparseGF2Matrix, DenseGF2Matrix], b: Union[list[int], np.ndarray]) -> Optional[list[int]]:
+def solve(A: SparseGF2Matrix | DenseGF2Matrix, b: list[int] | np.ndarray) -> list[int] | None:
     """
     Solve linear system Ax = b over GF(2).
 
@@ -80,7 +79,7 @@ def solve(A: Union[SparseGF2Matrix, DenseGF2Matrix], b: Union[list[int], np.ndar
     return solution
 
 
-def nullspace(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> list[list[int]]:
+def nullspace(A: SparseGF2Matrix | DenseGF2Matrix) -> list[list[int]]:
     """
     Find basis for null space of A using optimized GF(2) operations.
     This is the enhanced algorithm from Simon's algorithm postprocessing.
@@ -89,16 +88,14 @@ def nullspace(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> list[list[int]]:
         List of basis vectors for null(A)
     """
     # Convert to packed representation
-    rows = []
-    for i in range(A.rows):
-        rows.append(A.get_row_bitwise(i))
+    rows = [A.get_row_bitwise(i) for i in range(A.rows)]
 
     # Gaussian elimination to find pivot columns
     rref_rows, pivot_cols = gaussian_elimination_inplace(rows, A.cols)
 
     # Find free columns
     all_cols = set(range(A.cols))
-    free_cols = sorted(list(all_cols - set(pivot_cols)))
+    free_cols = sorted(all_cols - set(pivot_cols))
 
     if not free_cols:
         # Null space is trivial
@@ -130,7 +127,7 @@ def nullspace(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> list[list[int]]:
     return basis
 
 
-def nullspace_bitwise(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> tuple[str, float]:
+def nullspace_bitwise(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[str, float]:
     """
     Optimized nullspace computation returning single solution as bit string.
     This is the original algorithm from Simon's algorithm postprocessing.
@@ -143,10 +140,8 @@ def nullspace_bitwise(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> tuple[str, f
     # Convert to list of lists for compatibility with original algorithm
     matrix_list = []
     for i in range(A.rows):
-        row = []
         row_packed = A.get_row_bitwise(i)
-        for j in range(A.cols):
-            row.append((row_packed >> j) & 1)
+        row = [(row_packed >> j) & 1 for j in range(A.cols)]
         matrix_list.append(row)
 
     # Use original optimized algorithm
@@ -208,7 +203,7 @@ def _gaussian_elimination_GF2_bitwise(rows, n):
 def _nullspace_solution_bitwise(rows, pivot_cols, n):
     """Original optimized nullspace solution."""
     all_cols = set(range(n))
-    free_cols = sorted(list(all_cols - set(pivot_cols)))
+    free_cols = sorted(all_cols - set(pivot_cols))
 
     if not free_cols:
         raise ValueError("No free variable found; the system appears to be full rank.")
@@ -232,7 +227,7 @@ def _nullspace_solution_bitwise(rows, pivot_cols, n):
     return sol_int
 
 
-def inverse(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> Optional[SparseGF2Matrix]:
+def inverse(A: SparseGF2Matrix | DenseGF2Matrix) -> SparseGF2Matrix | None:
     """
     Compute matrix inverse over GF(2) using Gauss-Jordan elimination.
 
@@ -288,9 +283,7 @@ def inverse(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> Optional[SparseGF2Matr
     return result
 
 
-def least_squares(
-    A: Union[SparseGF2Matrix, DenseGF2Matrix], b: Union[list[int], np.ndarray]
-) -> Optional[list[int]]:
+def least_squares(A: SparseGF2Matrix | DenseGF2Matrix, b: list[int] | np.ndarray) -> list[int] | None:
     """
     Solve overdetermined system in least squares sense over GF(2).
 
@@ -318,7 +311,7 @@ def least_squares(
     return solve(ATA, ATb)
 
 
-def kernel(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> list[list[int]]:
+def kernel(A: SparseGF2Matrix | DenseGF2Matrix) -> list[list[int]]:
     """
     Compute kernel (null space) of matrix A.
     Alias for nullspace function.
@@ -326,7 +319,7 @@ def kernel(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> list[list[int]]:
     return nullspace(A)
 
 
-def image(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> list[list[int]]:
+def image(A: SparseGF2Matrix | DenseGF2Matrix) -> list[list[int]]:
     """
     Compute image (column space) of matrix A.
 
@@ -339,25 +332,20 @@ def image(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> list[list[int]]:
     AT = transpose(A)
 
     # Find row echelon form
-    rows = []
-    for i in range(AT.rows):
-        rows.append(AT.get_row_bitwise(i))
-
+    rows = [AT.get_row_bitwise(i) for i in range(AT.rows)]
     rref_rows, pivot_cols = gaussian_elimination_inplace(rows, AT.cols)
 
     # Convert back to column vectors
     basis = []
     for row_packed in rref_rows:
         if row_packed != 0:  # Non-zero row
-            col_vector = []
-            for i in range(AT.cols):
-                col_vector.append((row_packed >> i) & 1)
+            col_vector = [(row_packed >> i) & 1 for i in range(AT.cols)]
             basis.append(col_vector)
 
     return basis
 
 
-def rank_nullity_theorem(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> tuple[int, int, int]:
+def rank_nullity_theorem(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[int, int, int]:
     """
     Verify rank-nullity theorem: rank(A) + nullity(A) = cols(A).
 
@@ -373,9 +361,8 @@ def rank_nullity_theorem(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> tuple[int
     return matrix_rank, nullity, A.cols
 
 
-def solve_multiple_rhs(
-    A: Union[SparseGF2Matrix, DenseGF2Matrix], B: Union[SparseGF2Matrix, DenseGF2Matrix]
-) -> Optional[SparseGF2Matrix]:
+def solve_multiple_rhs(A: SparseGF2Matrix | DenseGF2Matrix,
+                       B: SparseGF2Matrix | DenseGF2Matrix) -> SparseGF2Matrix | None:
     """
     Solve AX = B for matrix X (multiple right-hand sides).
 
@@ -421,7 +408,7 @@ def solve_multiple_rhs(
     return result
 
 
-def condition_analysis(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> dict:
+def condition_analysis(A: SparseGF2Matrix | DenseGF2Matrix) -> dict:
     """
     Analyze condition properties of matrix over GF(2).
 
@@ -459,11 +446,11 @@ def condition_analysis(A: Union[SparseGF2Matrix, DenseGF2Matrix]) -> dict:
 
 
 def iterative_refinement(
-    A: Union[SparseGF2Matrix, DenseGF2Matrix],
-    b: Union[list[int], np.ndarray],
-    x0: Optional[list[int]] = None,
+    A: SparseGF2Matrix | DenseGF2Matrix,
+    b: list[int] | np.ndarray,
+    x0: list[int] | None = None,
     max_iterations: int = 10,
-) -> tuple[Optional[list[int]], int]:
+) -> tuple[list[int] | None, int]:
     """
     Iterative refinement for solving Ax = b over GF(2).
 
@@ -506,9 +493,9 @@ def iterative_refinement(
     return x, max_iterations
 
 
-def benchmark_solver(
-    A: Union[SparseGF2Matrix, DenseGF2Matrix], b: Union[list[int], np.ndarray], num_trials: int = 100
-) -> dict:
+def benchmark_solver(A: SparseGF2Matrix | DenseGF2Matrix,
+                     b: list[int] | np.ndarray,
+                     num_trials: int = 100) -> dict:
     """
     Benchmark solver performance.
 

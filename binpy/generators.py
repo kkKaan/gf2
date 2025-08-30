@@ -14,7 +14,6 @@ Generators:
 """
 
 import random
-from typing import Optional
 
 from .sparse import SparseGF2Matrix, create_sparse_matrix
 
@@ -36,7 +35,7 @@ def ones(rows: int, cols: int) -> SparseGF2Matrix:
     return create_sparse_matrix(rows, cols, coordinates=coordinates)
 
 
-def random_sparse(rows: int, cols: int, density: float, seed: Optional[int] = None) -> SparseGF2Matrix:
+def random_sparse(rows: int, cols: int, density: float, seed: int | None = None) -> SparseGF2Matrix:
     """
     Generate random sparse binary matrix.
 
@@ -51,9 +50,11 @@ def random_sparse(rows: int, cols: int, density: float, seed: Optional[int] = No
     return create_sparse_matrix(rows, cols, density=density)
 
 
-def random_regular(
-    rows: int, cols: int, row_weight: int, col_weight: Optional[int] = None, seed: Optional[int] = None
-) -> SparseGF2Matrix:
+def random_regular(rows: int,
+                   cols: int,
+                   row_weight: int,
+                   col_weight: int | None = None,
+                   seed: int | None = None) -> SparseGF2Matrix:
     """
     Generate random regular binary matrix (constant row/column weights).
 
@@ -83,19 +84,17 @@ def random_regular(
     # Create a bipartite graph representation
     edge_list = []
     for i in range(rows):
-        for _ in range(row_weight):
-            edge_list.append(i)
+        edge_list.extend([i] * row_weight)
 
     # Randomly assign column endpoints
     col_assignments = []
     for j in range(cols):
-        for _ in range(col_weight):
-            col_assignments.append(j)
+        col_assignments.extend([j] * col_weight)
 
     random.shuffle(col_assignments)
 
     # Create coordinates
-    for i, j in zip(edge_list, col_assignments):
+    for i, j in zip(edge_list, col_assignments, strict=False):
         coordinates.append((i, j))
 
     return create_sparse_matrix(rows, cols, coordinates=coordinates)
@@ -111,16 +110,12 @@ def circulant(first_row: list[int]) -> SparseGF2Matrix:
     n = len(first_row)
     coordinates = []
 
-    for i in range(n):
-        for j in range(n):
-            # Circulant: A[i,j] = first_row[(j-i) % n]
-            if first_row[(j - i) % n] == 1:
-                coordinates.append((i, j))
+    coordinates = [(i, j) for i in range(n) for j in range(n) if first_row[(j - i) % n] == 1]
 
     return create_sparse_matrix(n, n, coordinates=coordinates)
 
 
-def circulant_random(n: int, weight: int, seed: Optional[int] = None) -> SparseGF2Matrix:
+def circulant_random(n: int, weight: int, seed: int | None = None) -> SparseGF2Matrix:
     """Create random circulant matrix with given weight."""
     if seed is not None:
         random.seed(seed)
@@ -200,10 +195,12 @@ def hamming_matrix(r: int) -> SparseGF2Matrix:
     n = (1 << r) - 1  # 2^r - 1
     coordinates = []
 
-    for col in range(1, n + 1):  # Columns 1 to n
-        for row in range(r):
-            if (col >> row) & 1:  # Check if bit 'row' is set in 'col'
-                coordinates.append((row, col - 1))  # Convert to 0-indexed
+    coordinates = [
+        (row, col - 1)
+        for col in range(1, n + 1)
+        for row in range(r)
+        if (col >> row) & 1  # Check if bit 'row' is set in 'col'
+    ]
 
     return create_sparse_matrix(r, n, coordinates=coordinates)
 
@@ -224,14 +221,13 @@ def bch_matrix(n: int, k: int, t: int) -> SparseGF2Matrix:
     # Full BCH construction requires finite field arithmetic
 
     r = n - k  # Number of parity checks
-    coordinates = []
 
-    # Generate using primitive polynomial approach (simplified)
-    for i in range(r):
-        for j in range(n):
-            # Simplified pattern based on powers of primitive element
-            if ((i + 1) * (j + 1)) % 3 == 1:  # Simplified condition
-                coordinates.append((i, j))
+    coordinates = [
+        (i, j)
+        for i in range(r)
+        for j in range(n)
+        if ((i + 1) * (j + 1)) % 3 == 1  # primitive polynomial approach simplified condition
+    ]
 
     return create_sparse_matrix(r, n, coordinates=coordinates)
 
@@ -240,9 +236,9 @@ def ldpc_matrix(
     m: int,
     n: int,
     row_weight: int,
-    col_weight: Optional[int] = None,
+    col_weight: int | None = None,
     method: str = "random",
-    seed: Optional[int] = None,
+    seed: int | None = None,
 ) -> SparseGF2Matrix:
     """
     Generate LDPC (Low-Density Parity-Check) code matrix.
@@ -364,10 +360,7 @@ def surface_code_matrix(distance: int, boundary: str = "open") -> tuple[SparseGF
                 (row + 1) * distance + col + 1,
             ]
 
-            for qubit in qubits:
-                if qubit < n_data:
-                    x_coordinates.append((stab_idx, qubit))
-
+            x_coordinates.extend([(stab_idx, qubit) for qubit in qubits if qubit < n_data])
             stab_idx += 1
 
     # Generate Z stabilizers (star operators)
@@ -384,10 +377,7 @@ def surface_code_matrix(distance: int, boundary: str = "open") -> tuple[SparseGF
                 row * distance + col + 1,
             ]
 
-            for qubit in qubits:
-                if 0 <= qubit < n_data:
-                    z_coordinates.append((stab_idx, qubit))
-
+            z_coordinates.extend([(stab_idx, qubit) for qubit in qubits if 0 <= qubit < n_data])
             stab_idx += 1
 
     H_x = create_sparse_matrix(n_x_stabs, n_data, coordinates=x_coordinates)
@@ -421,15 +411,11 @@ def color_code_matrix(distance: int) -> tuple[SparseGF2Matrix, SparseGF2Matrix]:
         for j in range(0, distance - 2, 2):
             # X stabilizer on 3 qubits (triangle)
             qubits_x = [i + j, i + j + 1, i + j + distance]
-            for qubit in qubits_x:
-                if qubit < n_data:
-                    x_coordinates.append((stab_idx, qubit))
+            x_coordinates.extend([(stab_idx, qubit) for qubit in qubits_x if qubit < n_data])
 
             # Z stabilizer on adjacent triangle
             qubits_z = [i + j + 1, i + j + 2, i + j + distance + 1]
-            for qubit in qubits_z:
-                if qubit < n_data:
-                    z_coordinates.append((stab_idx, qubit))
+            z_coordinates.extend([(stab_idx, qubit) for qubit in qubits_z if qubit < n_data])
 
             stab_idx += 1
 
@@ -459,17 +445,13 @@ def css_code_matrix(H1: SparseGF2Matrix, H2: SparseGF2Matrix) -> tuple[SparseGF2
     x_coordinates = []
     for i in range(H1.rows):
         row_packed = H1.get_row_bitwise(i)
-        for j in range(n1):
-            if (row_packed >> j) & 1:
-                x_coordinates.append((i, j))
+        x_coordinates.extend([(i, j) for j in range(n1) if (row_packed >> j) & 1])
 
     # Construct H_z = [0 | H2]
     z_coordinates = []
     for i in range(H2.rows):
         row_packed = H2.get_row_bitwise(i)
-        for j in range(n2):
-            if (row_packed >> j) & 1:
-                z_coordinates.append((i, n1 + j))
+        z_coordinates.extend([(i, n1 + j) for j in range(n2) if (row_packed >> j) & 1])
 
     H_x = create_sparse_matrix(H1.rows, total_qubits, coordinates=x_coordinates)
     H_z = create_sparse_matrix(H2.rows, total_qubits, coordinates=z_coordinates)
@@ -555,15 +537,11 @@ def bicycle_codes(block_size: int, circulant_A: list[int], circulant_B: list[int
     # Add A block (left)
     for i in range(block_size):
         row_packed = A.get_row_bitwise(i)
-        for j in range(block_size):
-            if (row_packed >> j) & 1:
-                coordinates.append((i, j))
+        coordinates.extend([(i, j) for j in range(block_size) if (row_packed >> j) & 1])
 
     # Add B block (right)
     for i in range(block_size):
         row_packed = B.get_row_bitwise(i)
-        for j in range(block_size):
-            if (row_packed >> j) & 1:
-                coordinates.append((i, block_size + j))
+        coordinates.extend([(i, block_size + j) for j in range(block_size) if (row_packed >> j) & 1])
 
     return create_sparse_matrix(block_size, 2 * block_size, coordinates=coordinates)

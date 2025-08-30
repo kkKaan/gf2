@@ -1,7 +1,9 @@
+import pytest
 from binpy.generators import identity
 from binpy.solvers import inverse, solve
 
 
+@pytest.mark.unit
 def test_solve_identity_system():
     identity_matrix = identity(6)
     b = [1, 0, 1, 0, 1, 0]
@@ -9,6 +11,7 @@ def test_solve_identity_system():
     assert x == b
 
 
+@pytest.mark.unit
 def test_inverse_identity():
     identity_matrix = identity(7)
     inv = inverse(identity_matrix)

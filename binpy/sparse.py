@@ -14,7 +14,6 @@ Storage Formats:
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 
@@ -153,7 +152,7 @@ class SparseGF2Matrix:
     def _coo_to_csr(self, row_indices: list[int], col_indices: list[int]):
         """Convert coordinate format to CSR."""
         # Sort by row index
-        sorted_pairs = sorted(zip(row_indices, col_indices))
+        sorted_pairs = sorted(zip(row_indices, col_indices, strict=False))
 
         self.csr_row_ptr = [0] * (self.rows + 1)
         self.csr_col_ind = []
@@ -184,7 +183,7 @@ class SparseGF2Matrix:
         words_per_row = (self.cols + 63) // 64
         self.bitpacked_rows = np.zeros((self.rows, words_per_row), dtype=np.uint64)
 
-        for row, col in zip(row_indices, col_indices):
+        for row, col in zip(row_indices, col_indices, strict=False):
             word_idx = col // 64
             bit_idx = col % 64
             self.bitpacked_rows[row, word_idx] |= 1 << bit_idx
@@ -316,6 +315,34 @@ class SparseGF2Matrix:
         dense_matrix[row][col] = 1
         self._from_dense(dense_matrix, self.format)
 
+    def get(self, row: int, col: int) -> int:
+        """Get element at (row, col). Alias for get_bit for compatibility."""
+        return self.get_bit(row, col)
+
+    def set(self, row: int, col: int, value: int):
+        """Set element at (row, col). Only supports setting to 1 (use for compatibility)."""
+        if value:
+            self.set_bit(row, col)
+
+    def get_bit(self, row: int, col: int) -> int:
+        """Get bit at (row, col)."""
+        if self.format == "bitpacked":
+            word_idx = col // 64
+            bit_idx = col % 64
+            return int((self.bitpacked_rows[row, word_idx] >> bit_idx) & 1)
+        elif self.format in ["csr", "csr_compact"]:
+            # Check if bit is set in CSR format
+            start = self.csr_row_ptr[row]
+            end = self.csr_row_ptr[row + 1]
+            for idx in range(start, end):
+                if self.csr_col_ind[idx] == col:
+                    return 1
+            return 0
+        elif self.format == "empty":
+            return 0
+        else:
+            raise ValueError(f"Unsupported format: {self.format}")
+
     def to_dense(self) -> list[list[int]]:
         """Convert back to dense format for debugging/testing."""
         result = [[0] * self.cols for _ in range(self.rows)]
@@ -330,12 +357,10 @@ class SparseGF2Matrix:
 
     def __repr__(self):
         stats = self.memory_usage()
-        return (
-            f"SparseGF2Matrix({self.rows}x{self.cols}, "
-            f"nnz={stats.nnz}, density={stats.density:.3f}, "
-            f"format={self.format}, memory={stats.memory_bytes}B, "
-            f"compression={stats.compression_ratio:.1f}x)"
-        )
+        return (f"SparseGF2Matrix({self.rows}x{self.cols}, "
+                f"nnz={stats.nnz}, density={stats.density:.3f}, "
+                f"format={self.format}, memory={stats.memory_bytes}B, "
+                f"compression={stats.compression_ratio:.1f}x)")
 
 
 class DenseGF2Matrix:
@@ -374,6 +399,15 @@ class DenseGF2Matrix:
         bit_idx = col % 64
         return int((self.data[row, word_idx] >> bit_idx) & 1)
 
+    def get(self, row: int, col: int) -> int:
+        """Get element at (row, col). Alias for get_bit for compatibility."""
+        return self.get_bit(row, col)
+
+    def set(self, row: int, col: int, value: int):
+        """Set element at (row, col). Only supports setting to 1 (use for compatibility)."""
+        if value:
+            self.set_bit(row, col)
+
     def get_row_bitwise(self, row_idx: int) -> int:
         """Get row as packed integer."""
         if self.cols <= 64:
@@ -398,8 +432,8 @@ class DenseGF2Matrix:
 def create_sparse_matrix(
     rows: int,
     cols: int,
-    coordinates: Optional[list[tuple[int, int]]] = None,
-    density: Optional[float] = None,
+    coordinates: list[tuple[int, int]] | None = None,
+    density: float | None = None,
     format_hint: str = "auto",
 ) -> SparseGF2Matrix:
     """
