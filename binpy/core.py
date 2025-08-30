@@ -25,8 +25,9 @@ def _popcount_parity(x: int) -> int:
         return bin(x).count("1") % 2
 
 
-def add(A: SparseGF2Matrix | DenseGF2Matrix,
-        B: SparseGF2Matrix | DenseGF2Matrix) -> SparseGF2Matrix | DenseGF2Matrix:
+def add(
+    A: SparseGF2Matrix | DenseGF2Matrix, B: SparseGF2Matrix | DenseGF2Matrix
+) -> SparseGF2Matrix | DenseGF2Matrix:
     """
     Add two GF(2) matrices: C = A + B (XOR).
 
@@ -53,8 +54,9 @@ def add(A: SparseGF2Matrix | DenseGF2Matrix,
     return result
 
 
-def multiply(A: SparseGF2Matrix | DenseGF2Matrix,
-             B: SparseGF2Matrix | DenseGF2Matrix) -> SparseGF2Matrix | DenseGF2Matrix:
+def multiply(
+    A: SparseGF2Matrix | DenseGF2Matrix, B: SparseGF2Matrix | DenseGF2Matrix
+) -> SparseGF2Matrix | DenseGF2Matrix:
     """
     Multiply two GF(2) matrices: C = A * B.
 
