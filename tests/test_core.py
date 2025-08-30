@@ -1,4 +1,5 @@
 import pytest
+
 from binpy.core import add, det, is_invertible, multiply, rank, transpose
 from binpy.generators import identity, zeros
 

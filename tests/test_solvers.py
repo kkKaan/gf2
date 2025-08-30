@@ -1,4 +1,5 @@
 import pytest
+
 from binpy.generators import identity
 from binpy.solvers import inverse, solve
 
