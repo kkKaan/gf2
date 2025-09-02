@@ -220,7 +220,8 @@ class SparseGF2Matrix:
             end = self.csr_row_ptr[row_idx + 1]
 
             for col_idx in self.csr_col_ind[start:end]:
-                result |= 1 << col_idx
+                # Convert numpy types to Python int to avoid overflow issues
+                result |= 1 << int(col_idx)
 
             return result
 
@@ -381,12 +382,10 @@ class SparseGF2Matrix:
 
     def __repr__(self):
         stats = self.memory_usage()
-        return (
-            f"SparseGF2Matrix({self.rows}x{self.cols}, "
-            f"nnz={stats.nnz}, density={stats.density:.3f}, "
-            f"format={self.format}, memory={stats.memory_bytes}B, "
-            f"compression={stats.compression_ratio:.1f}x)"
-        )
+        return (f"SparseGF2Matrix({self.rows}x{self.cols}, "
+                f"nnz={stats.nnz}, density={stats.density:.3f}, "
+                f"format={self.format}, memory={stats.memory_bytes}B, "
+                f"compression={stats.compression_ratio:.1f}x)")
 
 
 class DenseGF2Matrix:
