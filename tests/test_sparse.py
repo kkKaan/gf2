@@ -437,8 +437,7 @@ class TestMemoryCompressionAdvanced:
         block_coords = []
         for block in range(10):
             for i in range(5):
-                for j in range(5):
-                    block_coords.extend((block * 5 + i, block * 5 + j))
+                block_coords.extend([(block * 5 + i, block * 5 + j) for j in range(5)])
 
         block_row_indices = [coord[0] for coord in block_coords]
         block_col_indices = [coord[1] for coord in block_coords]
@@ -615,9 +614,7 @@ class TestBitwiseOperationsComprehensive:
         # Create complex pattern
         coords = []
         for i in range(10):
-            for j in range(20):
-                if (i * j) % 3 == 0 or i == j:
-                    coords.extend((i, j))
+            coords.extend([(i, j) for j in range(20) if (i * j) % 3 == 0 or i == j])
 
         row_indices = [coord[0] for coord in coords]
         col_indices = [coord[1] for coord in coords]

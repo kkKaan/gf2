@@ -152,7 +152,9 @@ class SparseGF2Matrix:
                 if val & 1:
                     word_idx = j // 64
                     bit_idx = j % 64
-                    self.bitpacked_rows[i, word_idx] |= 1 << bit_idx
+                    # Use Python int arithmetic to avoid numpy in-place ufunc casting issues
+                    current = int(self.bitpacked_rows[i, word_idx])
+                    self.bitpacked_rows[i, word_idx] = current | (1 << bit_idx)
 
     def _coo_to_csr(self, row_indices: list[int], col_indices: list[int]):
         """Convert coordinate format to CSR."""
@@ -191,7 +193,9 @@ class SparseGF2Matrix:
         for row, col in zip(row_indices, col_indices, strict=False):
             word_idx = col // 64
             bit_idx = col % 64
-            self.bitpacked_rows[row, word_idx] |= 1 << bit_idx
+            # Read-modify-write using Python int to avoid numpy ufunc casting errors
+            current = int(self.bitpacked_rows[row, word_idx])
+            self.bitpacked_rows[row, word_idx] = current | (1 << bit_idx)
 
     def get_row_bitwise(self, row_idx: int) -> int:
         """
@@ -352,7 +356,9 @@ class SparseGF2Matrix:
                 raise ValueError("Bitpacked rows not initialized")
             word_idx = col // 64
             bit_idx = col % 64
-            return int((self.bitpacked_rows[row, word_idx] >> bit_idx) & 1)
+            # Convert to Python int first to avoid numpy ufunc casting issues
+            value = int(self.bitpacked_rows[row, word_idx])
+            return (value >> bit_idx) & 1
         elif self.format in ["csr", "csr_compact"]:
             # Check if bit is set in CSR format
             if self.csr_row_ptr is None or self.csr_col_ind is None:
@@ -393,7 +399,7 @@ class SparseGF2Matrix:
 class DenseGF2Matrix:
     """
     Bit-packed dense matrix for cases where sparsity doesn't help.
-    Uses 1 bit per element instead of 8 bits (byte) or 64 bits (int).
+    Uses 1 bit per element packed into 64-bit words.
     """
 
     def __init__(self, rows: int, cols: int, data=None):
@@ -408,51 +414,59 @@ class DenseGF2Matrix:
             self._load_data(data)
 
     def _load_data(self, matrix: list[list[int]]):
-        """Load from dense matrix."""
+        """Load from dense matrix (list of lists)."""
         for i, row in enumerate(matrix):
             for j, val in enumerate(row):
                 if val & 1:
                     self.set_bit(i, j)
 
     def set_bit(self, row: int, col: int):
-        """Set bit at (row, col) to 1."""
+        """Set bit at (row, col) to 1 using safe read-modify-write."""
         word_idx = col // 64
         bit_idx = col % 64
-        self.data[row, word_idx] |= 1 << bit_idx
+        # Read-modify-write using Python int to avoid numpy ufunc casting issues
+        current = int(self.data[row, word_idx])
+        self.data[row, word_idx] = current | (1 << bit_idx)
 
     def get_bit(self, row: int, col: int) -> int:
         """Get bit at (row, col)."""
         word_idx = col // 64
         bit_idx = col % 64
-        return int((self.data[row, word_idx] >> bit_idx) & 1)
+        # Convert to Python int first to avoid numpy ufunc casting during shifts
+        value = int(self.data[row, word_idx])
+        return (value >> bit_idx) & 1
 
     def get(self, row: int, col: int) -> int:
         """Get element at (row, col). Alias for get_bit for compatibility."""
         return self.get_bit(row, col)
 
     def set(self, row: int, col: int, value: int):
-        """Set element at (row, col). Only supports setting to 1 (use for compatibility)."""
+        """Set element at (row, col). Only supports setting to 1 (compatibility)."""
         if value:
             self.set_bit(row, col)
 
     def get_row_bitwise(self, row_idx: int) -> int:
-        """Get row as packed integer."""
+        """Get row as a packed Python int (concatenate 64-bit words)."""
         if self.cols <= 64:
             return int(self.data[row_idx, 0])
         else:
-            # Combine multiple words
             result = 0
             for i, word in enumerate(self.data[row_idx]):
-                result |= word << (i * 64)
+                result |= int(word) << (i * 64)
             return result
 
     def memory_usage(self) -> SparseStats:
-        """Calculate memory usage."""
+        """Calculate memory usage and basic stats for dense matrix."""
+        # nnz = int(np.count_nonzero(self.data)) * 64
+        # Approximated nnz from stored words is coarse; compute exact count instead
+        exact_nnz = int(np.sum([bin(int(w)).count("1") for w in self.data.flatten()]))
+        total_bits = self.rows * self.cols
+        density = exact_nnz / total_bits if total_bits > 0 else 0
+        memory_bytes = self.data.nbytes
+        compression_ratio = (self.rows * self.cols) / memory_bytes if memory_bytes > 0 else 1.0
+
         return SparseStats(
-            nnz=np.sum(self.data != 0),  # Approximate
-            density=0.5,  # Assume average case
-            memory_bytes=self.data.nbytes,
-            compression_ratio=(self.rows * self.cols) / self.data.nbytes,
+            nnz=exact_nnz, density=density, memory_bytes=memory_bytes, compression_ratio=compression_ratio
         )
 
 
