@@ -49,8 +49,9 @@ class TestAdditionOperation:
 
                 # Verify commutativity
                 for i in range(A.rows):
-                    assert result_AB.get_row_bitwise(i) == result_BA.get_row_bitwise(i), \
+                    assert result_AB.get_row_bitwise(i) == result_BA.get_row_bitwise(i), (
                         f"Commutativity failed for {pair_name}"
+                    )
 
     @pytest.mark.unit
     def test_addition_associativity(self, small_matrices):
@@ -83,8 +84,9 @@ class TestAdditionOperation:
 
             # Verify A + 0 = A
             for i in range(A.rows):
-                assert result.get_row_bitwise(i) == A.get_row_bitwise(i), \
+                assert result.get_row_bitwise(i) == A.get_row_bitwise(i), (
                     f"Identity property failed for {matrix_name}"
+                )
 
     @pytest.mark.unit
     def test_addition_self_inverse(self, small_matrices):
@@ -97,8 +99,7 @@ class TestAdditionOperation:
 
             # Verify A + A = 0
             for i in range(A.rows):
-                assert result.get_row_bitwise(i) == 0, \
-                    f"Self-inverse property failed for {matrix_name}"
+                assert result.get_row_bitwise(i) == 0, f"Self-inverse property failed for {matrix_name}"
 
     @pytest.mark.unit
     def test_addition_dimension_mismatch_errors(self, small_matrices):
@@ -368,8 +369,9 @@ class TestTransposeOperation:
             assert ATT.cols == A.cols
 
             for i in range(A.rows):
-                assert ATT.get_row_bitwise(i) == A.get_row_bitwise(i), \
+                assert ATT.get_row_bitwise(i) == A.get_row_bitwise(i), (
                     f"Transpose involution failed for {matrix_name}"
+                )
 
     @pytest.mark.unit
     def test_transpose_addition_property(self, matrix_pairs):
@@ -387,8 +389,9 @@ class TestTransposeOperation:
 
                 # Verify (A + B)^T = A^T + B^T
                 for i in range(AB_sum_T.rows):
-                    assert AB_sum_T.get_row_bitwise(i) == AT_BT_sum.get_row_bitwise(i), \
+                    assert AB_sum_T.get_row_bitwise(i) == AT_BT_sum.get_row_bitwise(i), (
                         f"Transpose addition property failed for {pair_name}"
+                    )
 
     @pytest.mark.unit
     def test_transpose_multiplication_property(self, matrix_pairs):
@@ -411,8 +414,9 @@ class TestTransposeOperation:
 
                 # Verify (A * B)^T = B^T * A^T
                 for i in range(AB_T.rows):
-                    assert AB_T.get_row_bitwise(i) == BT_AT.get_row_bitwise(i), \
+                    assert AB_T.get_row_bitwise(i) == BT_AT.get_row_bitwise(i), (
                         f"Transpose multiplication property failed for {pair_name}"
+                    )
 
     @pytest.mark.unit
     def test_transpose_edge_cases(self, edge_case_matrices):
