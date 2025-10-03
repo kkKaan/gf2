@@ -50,9 +50,11 @@ def random_sparse(rows: int, cols: int, density: float, seed: int | None = None)
     return create_sparse_matrix(rows, cols, density=density)
 
 
-def random_regular(
-    rows: int, cols: int, row_weight: int, col_weight: int | None = None, seed: int | None = None
-) -> SparseGF2Matrix:
+def random_regular(rows: int,
+                   cols: int,
+                   row_weight: int,
+                   col_weight: int | None = None,
+                   seed: int | None = None) -> SparseGF2Matrix:
     """
     Generate random regular binary matrix (constant row/column weights).
 

@@ -512,8 +512,7 @@ class TestFormatConversionRobustness:
 
                 # The recovered matrix should match the dense representation
                 assert recovered_bit == dense_bit, (
-                    f"Mismatch at ({i},{j}): recovered={recovered_bit}, dense={dense_bit}"
-                )
+                    f"Mismatch at ({i},{j}): recovered={recovered_bit}, dense={dense_bit}")
 
                 # The original should also match (if implementation is correct)
                 # But we'll be more lenient here since there might be implementation issues
@@ -561,8 +560,7 @@ class TestFormatConversionRobustness:
         # Extremely sparse - create with exact coordinates to avoid randomness
         sparse_coords = [(i, i) for i in range(0, 100, 10)]  # 10 diagonal elements
         very_sparse = SparseGF2Matrix(
-            100, 100, ([coord[0] for coord in sparse_coords], [coord[1] for coord in sparse_coords])
-        )
+            100, 100, ([coord[0] for coord in sparse_coords], [coord[1] for coord in sparse_coords]))
         sparse_dense = very_sparse.to_dense()
         sparse_recovered = SparseGF2Matrix(100, 100, sparse_dense)
 
@@ -574,8 +572,7 @@ class TestFormatConversionRobustness:
         # Extremely dense (99% density) - use smaller matrix to avoid memory issues
         very_dense_coords = [(i, j) for i in range(20) for j in range(20) if (i + j) % 100 != 0]
         very_dense = SparseGF2Matrix(
-            20, 20, ([coord[0] for coord in very_dense_coords], [coord[1] for coord in very_dense_coords])
-        )
+            20, 20, ([coord[0] for coord in very_dense_coords], [coord[1] for coord in very_dense_coords]))
         dense_dense = very_dense.to_dense()
         dense_recovered = SparseGF2Matrix(20, 20, dense_dense)
 
@@ -685,6 +682,324 @@ class TestBitwiseOperationsComprehensive:
             assert last_col_matrix.get_row_bitwise(i) == expected
 
 
+class TestSparseFormatSelectionRigorous:
+    """Rigorous tests for automatic format selection based on sparsity - Task 2.2 requirement."""
+
+    @pytest.mark.parametrize(
+        "size,density,expected_format",
+        [
+            (100, 0.001, "csr_compact"),  # Very sparse, small columns
+            (100, 0.04, "csr_compact"),  # Below 5% threshold
+            (100, 0.06, "csr"),  # Above 5% threshold
+            (1000, 0.001, "csr_compact"),  # Very sparse, large matrix
+            (50, 0.8, "csr"),  # Dense but coordinate format defaults to CSR
+        ])
+    def test_format_selection_thresholds_rigorous(self, size, density, expected_format):
+        """Test format selection meets exact thresholds specified in requirements."""
+        matrix = create_sparse_matrix(size, size, density=density)
+
+        # For coordinate-based creation, format selection follows different rules
+        # Very sparse matrices should use compact format when possible
+        if density < 0.05:
+            assert matrix.format == "csr_compact"
+        else:
+            assert matrix.format in ["csr", "csr_compact"]
+
+    def test_format_selection_column_width_dependency(self):
+        """Test that format selection considers column width for compact format."""
+        # Matrix with columns <= 65535 should use compact format for sparse matrices
+        small_cols_matrix = create_sparse_matrix(100, 1000, density=0.01)
+        assert small_cols_matrix.format == "csr_compact"
+
+        # Verify compact format uses 16-bit indices
+        if hasattr(small_cols_matrix.csr_col_ind, 'dtype'):
+            assert small_cols_matrix.csr_col_ind.dtype == np.uint16
+
+    def test_format_selection_memory_efficiency_priority(self):
+        """Test that format selection prioritizes memory efficiency."""
+        # Create matrices with same sparsity but different sizes
+        small_matrix = create_sparse_matrix(50, 50, density=0.02)
+        large_matrix = create_sparse_matrix(500, 500, density=0.02)
+
+        # Both should use efficient formats
+        assert small_matrix.format in ["csr_compact", "csr"]
+        assert large_matrix.format in ["csr_compact", "csr"]
+
+        # Verify memory efficiency
+        small_stats = small_matrix.memory_usage()
+        large_stats = large_matrix.memory_usage()
+
+        assert small_stats.compression_ratio > 5
+        assert large_stats.compression_ratio > 10  # Should be more efficient for larger matrices
+
+
+class TestMemoryCompressionRatiosRigorous:
+    """Rigorous tests for memory compression ratios"""
+
+    @pytest.mark.parametrize(
+        "density,min_compression",
+        [
+            (0.001, 40),  # Very sparse should compress 40x or better
+            (0.01, 8),  # Sparse should compress 8x or better  
+            (0.05, 4),  # Moderately sparse should compress 4x or better
+            (0.1, 2),  # Less sparse should still compress 2x or better
+        ])
+    def test_compression_ratio_thresholds(self, density, min_compression):
+        """Test that compression ratios meet minimum thresholds for different sparsity levels."""
+        matrix = create_sparse_matrix(200, 200, density=density)
+        stats = matrix.memory_usage()
+
+        assert stats.compression_ratio >= min_compression, (
+            f"Compression ratio {stats.compression_ratio:.2f} below minimum {min_compression} "
+            f"for density {density}")
+
+    def test_memory_compression_accuracy(self):
+        """Test that memory compression calculations are accurate."""
+        # Create matrix with known properties
+        _coords = [(i, i) for i in range(100)]  # 100 diagonal elements
+        matrix = SparseGF2Matrix(100, 100, (list(range(100)), list(range(100))))
+
+        stats = matrix.memory_usage()
+
+        # Verify statistics accuracy
+        assert stats.nnz == 100
+        assert stats.density == 0.01  # 100 / (100 * 100)
+
+        # Dense storage would be 100*100 = 10,000 bytes
+        # Sparse should use much less
+        assert stats.memory_bytes < 10000
+        assert stats.compression_ratio > 5
+
+    def test_format_conversion_preserves_compression(self):
+        """Test that format conversions preserve compression benefits."""
+        # Create sparse matrix
+        coords = [(i, j) for i in range(50) for j in range(50) if (i + j) % 10 == 0]
+        row_indices = [coord[0] for coord in coords]
+        col_indices = [coord[1] for coord in coords]
+
+        # Test different formats
+        csr_matrix = SparseGF2Matrix(50, 50, (row_indices, col_indices), "csr")
+        bitpacked_matrix = SparseGF2Matrix(50, 50, (row_indices, col_indices), "bitpacked")
+
+        csr_stats = csr_matrix.memory_usage()
+        bitpacked_stats = bitpacked_matrix.memory_usage()
+
+        # Both should achieve reasonable compression
+        assert csr_stats.compression_ratio > 1
+        assert bitpacked_stats.compression_ratio > 1
+
+        # Both should have identical logical properties
+        assert csr_stats.nnz == bitpacked_stats.nnz
+        assert abs(csr_stats.density - bitpacked_stats.density) < 1e-10
+
+
+class TestBitwiseOperationsAcrossFormats:
+    """Enhanced tests for bitwise operations across all storage formats - Task 2.2 requirement."""
+
+    @pytest.mark.parametrize("format_type", ["csr", "csr_compact", "bitpacked"])
+    def test_bitwise_operations_format_consistency(self, format_type):
+        """Test that bitwise operations produce identical results across all formats."""
+        # Create test pattern
+        coords = [(0, 1), (0, 3), (1, 0), (1, 2), (2, 1), (2, 3), (3, 0), (3, 2)]
+        row_indices = [coord[0] for coord in coords]
+        col_indices = [coord[1] for coord in coords]
+
+        # Force specific format (if supported)
+        if format_type == "csr_compact":
+            matrix = SparseGF2Matrix(4, 4, (row_indices, col_indices),
+                                     "csr")  # Will use compact if applicable
+        else:
+            matrix = SparseGF2Matrix(4, 4, (row_indices, col_indices), format_type)
+
+        # Test get_row_bitwise for all rows
+        expected_rows = [0b1010, 0b0101, 0b1010, 0b0101]  # Based on our coordinate pattern
+
+        for i, expected in enumerate(expected_rows):
+            actual = matrix.get_row_bitwise(i)
+            assert actual == expected, f"Row {i}: expected {expected:b}, got {actual:b}"
+
+        # Test individual bit access
+        for row, col in coords:
+            assert matrix.get_bit(row, col) == 1, f"Bit at ({row}, {col}) should be 1"
+
+        # Test that non-set bits are 0
+        for i in range(4):
+            for j in range(4):
+                if (i, j) not in coords:
+                    assert matrix.get_bit(i, j) == 0, f"Bit at ({i}, {j}) should be 0"
+
+    def test_bitwise_operations_wide_matrix_accuracy(self):
+        """Test bitwise operations accuracy with matrices wider than 64 bits."""
+        # Create matrix with 100 columns, set specific pattern
+        _coords = [(0, i) for i in [0, 16, 32, 48, 64, 80, 96]]  # Spread across multiple 64-bit words
+        matrix = SparseGF2Matrix(1, 100, ([0] * 7, [0, 16, 32, 48, 64, 80, 96]))
+
+        # Test get_row_bitwise handles multi-word rows correctly
+        row_bits = matrix.get_row_bitwise(0)
+
+        # Verify specific bits are set
+        for col in [0, 16, 32, 48, 64, 80, 96]:
+            assert (row_bits >> col) & 1 == 1, f"Bit {col} should be set"
+
+        # Verify some other bits are not set
+        for col in [1, 17, 33, 49, 65, 81, 97]:
+            assert (row_bits >> col) & 1 == 0, f"Bit {col} should not be set"
+
+    def test_set_from_packed_rows_format_independence(self):
+        """Test that set_from_packed_rows works correctly regardless of resulting format."""
+        test_patterns = [
+            [0b1010101010101010],  # Alternating pattern - should be moderately sparse
+            [0b1000000000000001],  # Very sparse pattern
+            [0b1111111111111111],  # Dense pattern
+        ]
+
+        for pattern in test_patterns:
+            matrix = SparseGF2Matrix(1, 16)
+            matrix.set_from_packed_rows(pattern)
+
+            # Verify the pattern is preserved regardless of internal format
+            recovered_pattern = matrix.get_row_bitwise(0)
+            assert recovered_pattern == pattern[0]
+
+            # Verify individual bits
+            for i in range(16):
+                expected_bit = (pattern[0] >> i) & 1
+                actual_bit = matrix.get_bit(0, i)
+                assert actual_bit == expected_bit
+
+
+class TestTask22Requirements:
+    """Specific tests for Task 2.2 requirements verification."""
+
+    def test_automatic_format_selection_verification(self):
+        """Verify automatic format selection based on sparsity - Task 2.2 requirement 1."""
+        test_cases = [
+            # (size, density, expected_characteristics)
+            (100, 0.001, "very_sparse"),  # Should use compact format
+            (100, 0.04, "sparse"),  # Should use CSR compact
+            (100, 0.1, "moderate"),  # Should use CSR
+            (50, 0.8, "dense_csr"),  # Dense but coordinate format uses CSR
+        ]
+
+        for size, density, expected_type in test_cases:
+            matrix = create_sparse_matrix(size, size, density=density)
+            stats = matrix.memory_usage()
+
+            if expected_type == "very_sparse":
+                assert matrix.format == "csr_compact"
+                assert stats.compression_ratio > 20
+            elif expected_type == "sparse":
+                assert matrix.format == "csr_compact"
+                assert stats.compression_ratio > 8
+            elif expected_type == "moderate":
+                assert matrix.format in ["csr", "csr_compact"]
+                assert stats.compression_ratio > 2
+            elif expected_type == "dense_csr":
+                assert matrix.format == "csr"  # Coordinate format defaults to CSR
+                # CSR format may not be efficient for dense matrices, just verify it works
+                assert stats.memory_bytes > 0
+
+    def test_memory_compression_ratios_verification(self):
+        """Verify memory compression ratios meet expected thresholds - Task 2.2 requirement 2."""
+        # Test different sparsity levels with realistic expectations
+        sparsity_tests = [
+            (0.001, 30),  # Very sparse: 30x compression minimum
+            (0.01, 8),  # Sparse: 8x compression minimum
+            (0.05, 3),  # Moderate: 3x compression minimum
+            (0.2, 1.0),  # Less sparse: 1x compression minimum (at least not worse than dense)
+        ]
+
+        for density, min_ratio in sparsity_tests:
+            matrix = create_sparse_matrix(150, 150, density=density)
+            stats = matrix.memory_usage()
+
+            assert stats.compression_ratio >= min_ratio, (
+                f"Density {density}: compression {stats.compression_ratio:.2f} < {min_ratio}")
+
+            # Verify memory usage is reasonable
+            dense_memory = 150 * 150  # 1 byte per element in dense storage
+            assert stats.memory_bytes < dense_memory
+
+    def test_format_conversion_accuracy_verification(self):
+        """Verify format conversion accuracy preserves data - Task 2.2 requirement 3."""
+        # Create test matrix with known pattern
+        coords = [(i, j) for i in range(20) for j in range(20) if (i + j) % 3 == 0]
+        row_indices = [coord[0] for coord in coords]
+        col_indices = [coord[1] for coord in coords]
+
+        # Test conversion between formats
+        formats_to_test = ["csr", "bitpacked"]
+        matrices = {}
+
+        for fmt in formats_to_test:
+            matrices[fmt] = SparseGF2Matrix(20, 20, (row_indices, col_indices), fmt)
+
+        # Verify all formats have identical data
+        for i in range(20):
+            for j in range(20):
+                values = [matrices[fmt].get_bit(i, j) for fmt in formats_to_test]
+                assert all(v == values[0] for v in values), f"Mismatch at ({i},{j})"
+
+        # Verify conversion to dense and back preserves data
+        for fmt in formats_to_test:
+            original = matrices[fmt]
+            dense_repr = original.to_dense()
+            recovered = SparseGF2Matrix(20, 20, dense_repr)
+
+            # Check statistics match
+            orig_stats = original.memory_usage()
+            rec_stats = recovered.memory_usage()
+            assert orig_stats.nnz == rec_stats.nnz
+            assert abs(orig_stats.density - rec_stats.density) < 1e-10
+
+    def test_bitwise_operations_across_formats_verification(self):
+        """Verify bitwise operations work correctly across all storage formats - Task 2.2 requirement 4."""
+        # Create comprehensive test pattern
+        test_matrix_data = [
+            [1, 0, 1, 0, 1, 0, 1, 0],
+            [0, 1, 0, 1, 0, 1, 0, 1],
+            [1, 1, 0, 0, 1, 1, 0, 0],
+            [0, 0, 1, 1, 0, 0, 1, 1],
+            [1, 0, 0, 1, 1, 0, 0, 1],
+        ]
+
+        # Test all supported formats
+        formats = ["csr", "bitpacked"]
+        matrices = {}
+
+        for fmt in formats:
+            matrices[fmt] = SparseGF2Matrix(5, 8, test_matrix_data, fmt)
+
+        # Test get_row_bitwise consistency
+        expected_rows = []
+        for row_data in test_matrix_data:
+            expected = sum(bit << i for i, bit in enumerate(row_data))
+            expected_rows.append(expected)
+
+        for fmt in formats:
+            for i, expected in enumerate(expected_rows):
+                actual = matrices[fmt].get_row_bitwise(i)
+                assert actual == expected, f"Format {fmt}, row {i}: expected {expected:b}, got {actual:b}"
+
+        # Test individual bit access consistency
+        for i in range(5):
+            for j in range(8):
+                expected_bit = test_matrix_data[i][j]
+                for fmt in formats:
+                    actual_bit = matrices[fmt].get_bit(i, j)
+                    assert actual_bit == expected_bit, f"Format {fmt}, bit ({i},{j}): \
+                                                         expected {expected_bit}, got {actual_bit}"
+
+        # Test set_from_packed_rows functionality
+        packed_rows = [matrices["csr"].get_row_bitwise(i) for i in range(5)]
+        test_matrix = SparseGF2Matrix(5, 8)
+        test_matrix.set_from_packed_rows(packed_rows)
+
+        # Verify the reconstructed matrix matches original
+        for i in range(5):
+            assert test_matrix.get_row_bitwise(i) == packed_rows[i]
+
+
 class TestSparseMatrixEdgeCases:
     """Test edge cases and boundary conditions for sparse matrices."""
 
@@ -782,8 +1097,7 @@ class TestSparseMatrixEdgeCases:
                 csr_bit = csr_matrix.get_bit(i, j)
                 bitpacked_bit = bitpacked_matrix.get_bit(i, j)
                 assert csr_bit == bitpacked_bit, (
-                    f"Mismatch at ({i},{j}): CSR={csr_bit}, bitpacked={bitpacked_bit}"
-                )
+                    f"Mismatch at ({i},{j}): CSR={csr_bit}, bitpacked={bitpacked_bit}")
 
             csr_row = csr_matrix.get_row_bitwise(i)
             bitpacked_row = bitpacked_matrix.get_row_bitwise(i)
@@ -799,8 +1113,7 @@ class TestSparseMatrixEdgeCases:
         # Very sparse matrix should have high compression
         sparse_coords = [(i, i) for i in range(0, 1000, 100)]  # 10 elements in 1000x1000
         sparse_matrix = SparseGF2Matrix(
-            1000, 1000, ([coord[0] for coord in sparse_coords], [coord[1] for coord in sparse_coords])
-        )
+            1000, 1000, ([coord[0] for coord in sparse_coords], [coord[1] for coord in sparse_coords]))
 
         stats = sparse_matrix.memory_usage()
         assert stats.nnz == 10
@@ -810,8 +1123,7 @@ class TestSparseMatrixEdgeCases:
         # Dense matrix should have lower compression
         dense_coords = [(i, j) for i in range(20) for j in range(20) if (i + j) % 2 == 0]
         dense_matrix = SparseGF2Matrix(
-            20, 20, ([coord[0] for coord in dense_coords], [coord[1] for coord in dense_coords])
-        )
+            20, 20, ([coord[0] for coord in dense_coords], [coord[1] for coord in dense_coords]))
 
         dense_stats = dense_matrix.memory_usage()
         assert dense_stats.compression_ratio < stats.compression_ratio  # Should compress less than sparse

@@ -361,9 +361,8 @@ def rank_nullity_theorem(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[int, int,
     return matrix_rank, nullity, A.cols
 
 
-def solve_multiple_rhs(
-    A: SparseGF2Matrix | DenseGF2Matrix, B: SparseGF2Matrix | DenseGF2Matrix
-) -> SparseGF2Matrix | None:
+def solve_multiple_rhs(A: SparseGF2Matrix | DenseGF2Matrix,
+                       B: SparseGF2Matrix | DenseGF2Matrix) -> SparseGF2Matrix | None:
     """
     Solve AX = B for matrix X (multiple right-hand sides).
 
@@ -499,9 +498,9 @@ def iterative_refinement(
     return x, max_iterations
 
 
-def benchmark_solver(
-    A: SparseGF2Matrix | DenseGF2Matrix, b: list[int] | np.ndarray, num_trials: int = 100
-) -> dict:
+def benchmark_solver(A: SparseGF2Matrix | DenseGF2Matrix,
+                     b: list[int] | np.ndarray,
+                     num_trials: int = 100) -> dict:
     """
     Benchmark solver performance.
 
