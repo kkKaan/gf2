@@ -70,15 +70,17 @@ class TestLDPCGenerators:
         total_weight = 0
         for i in range(m):
             row_packed = H.get_row_bitwise(i)
-            actual_weight = bin(row_packed).count('1')
+            actual_weight = bin(row_packed).count("1")
             total_weight += actual_weight
 
         expected_total = m * row_weight
         # Allow some tolerance for random generation imperfections
-        assert total_weight >= expected_total * 0.7, \
+        assert total_weight >= expected_total * 0.7, (
             f"Total weight {total_weight} too low, expected around {expected_total}"
-        assert total_weight <= expected_total * 1.3, \
+        )
+        assert total_weight <= expected_total * 1.3, (
             f"Total weight {total_weight} too high, expected around {expected_total}"
+        )
 
     @pytest.mark.unit
     def test_ldpc_column_weight_constraints(self):
@@ -102,8 +104,9 @@ class TestLDPCGenerators:
             for i in range(m):
                 if H.get(i, j) == 1:
                     col_weight_actual += 1
-            assert col_weight_actual == expected_col_weight, \
+            assert col_weight_actual == expected_col_weight, (
                 f"Column {j} has weight {col_weight_actual}, expected {expected_col_weight}"
+            )
 
     @pytest.mark.unit
     def test_ldpc_explicit_column_weight(self):
@@ -120,7 +123,7 @@ class TestLDPCGenerators:
         # Verify row weights
         for i in range(m):
             row_packed = H.get_row_bitwise(i)
-            actual_weight = bin(row_packed).count('1')
+            actual_weight = bin(row_packed).count("1")
             assert actual_weight == row_weight
 
         # Verify column weights
@@ -152,7 +155,7 @@ class TestLDPCGenerators:
             # Check row weights
             for i in range(m):
                 row_packed = H.get_row_bitwise(i)
-                actual_weight = bin(row_packed).count('1')
+                actual_weight = bin(row_packed).count("1")
                 assert actual_weight == row_weight
 
     @pytest.mark.unit
@@ -183,16 +186,18 @@ class TestLDPCGenerators:
         total_weight = 0
         for i in range(rows):
             row_packed = H.get_row_bitwise(i)
-            actual_weight = bin(row_packed).count('1')
+            actual_weight = bin(row_packed).count("1")
             total_weight += actual_weight
 
         # Total weight should be approximately rows * row_weight
         expected_total = rows * row_weight
         # Allow some tolerance for random generation imperfections
-        assert total_weight >= expected_total * 0.8, \
+        assert total_weight >= expected_total * 0.8, (
             f"Total weight {total_weight} too low, expected around {expected_total}"
-        assert total_weight <= expected_total * 1.2, \
+        )
+        assert total_weight <= expected_total * 1.2, (
             f"Total weight {total_weight} too high, expected around {expected_total}"
+        )
 
         # Verify column weights (with tolerance for imperfect random generation)
         total_col_weight = 0
@@ -201,8 +206,9 @@ class TestLDPCGenerators:
             total_col_weight += col_weight_actual
 
         expected_total_col = cols * col_weight
-        assert total_col_weight >= expected_total_col * 0.8, \
+        assert total_col_weight >= expected_total_col * 0.8, (
             f"Total column weight too low: {total_col_weight} vs {expected_total_col}"
+        )
 
     @pytest.mark.property
     @given(st.integers(min_value=2, max_value=8), st.integers(min_value=2, max_value=4))
@@ -224,10 +230,11 @@ class TestLDPCGenerators:
             assert H.cols == n
 
             # Row weight property (check total weight with tolerance)
-            total_weight = sum(bin(H.get_row_bitwise(i)).count('1') for i in range(m))
+            total_weight = sum(bin(H.get_row_bitwise(i)).count("1") for i in range(m))
             expected_total = m * row_weight
-            assert total_weight >= expected_total * 0.5, \
+            assert total_weight >= expected_total * 0.5, (
                 f"Total weight too low: {total_weight} vs {expected_total}"
+            )
 
         except ValueError:
             # Some parameter combinations may be invalid
@@ -255,7 +262,7 @@ class TestClassicalCodeGenerators:
             col_value = 0
             for i in range(H.rows):
                 if H.get(i, j) == 1:
-                    col_value |= (1 << i)
+                    col_value |= 1 << i
             columns.add(col_value)
             assert col_value != 0, f"Column {j} is all zeros"
 
@@ -275,7 +282,7 @@ class TestClassicalCodeGenerators:
         expected_row_weight = 1 << (r - 1)  # 2^(r-1)
         for i in range(r):
             row_packed = H.get_row_bitwise(i)
-            actual_weight = bin(row_packed).count('1')
+            actual_weight = bin(row_packed).count("1")
             assert actual_weight == expected_row_weight
 
     @pytest.mark.unit
@@ -338,8 +345,7 @@ class TestClassicalCodeGenerators:
             syndrome_value = sum(syndrome[i] << i for i in range(r))
             expected_syndrome = sum(H.get(i, error_pos) << i for i in range(r))
 
-            assert syndrome_value == expected_syndrome, \
-                f"Syndrome mismatch for error at position {error_pos}"
+            assert syndrome_value == expected_syndrome, f"Syndrome mismatch for error at position {error_pos}"
 
     @pytest.mark.unit
     def test_bch_matrix_basic(self):
@@ -507,8 +513,13 @@ class TestStructuredMatrixGenerators:
         # Verify Toeplitz property: T[i,j] depends only on (i-j)
         for i in range(T.rows):
             for j in range(T.cols):
-                expected = (first_col[i - j] if i - j >= 0 and i - j < len(first_col) else
-                            first_row[j - i] if j - i >= 0 and j - i < len(first_row) else 0)
+                expected = (
+                    first_col[i - j]
+                    if i - j >= 0 and i - j < len(first_col)
+                    else first_row[j - i]
+                    if j - i >= 0 and j - i < len(first_row)
+                    else 0
+                )
 
                 actual = T.get(i, j)
                 assert actual == expected, f"Toeplitz property violated at ({i},{j})"
@@ -553,8 +564,7 @@ class TestStructuredMatrixGenerators:
 
         for i in range(T_T.rows):
             for j in range(T_T.cols):
-                assert T_T.get(i, j) == T_expected.get(i, j), \
-                    f"Transpose property violated at ({i},{j})"
+                assert T_T.get(i, j) == T_expected.get(i, j), f"Transpose property violated at ({i},{j})"
 
     @pytest.mark.unit
     def test_toeplitz_rank_properties(self):
@@ -709,8 +719,10 @@ class TestStructuredMatrixGenerators:
                 assert actual == expected
 
     @pytest.mark.property
-    @given(st.lists(st.integers(min_value=0, max_value=1), min_size=2, max_size=6),
-           st.lists(st.integers(min_value=0, max_value=1), min_size=2, max_size=6))
+    @given(
+        st.lists(st.integers(min_value=0, max_value=1), min_size=2, max_size=6),
+        st.lists(st.integers(min_value=0, max_value=1), min_size=2, max_size=6),
+    )
     def test_toeplitz_property_based(self, first_row, first_col):
         """Property-based test for Toeplitz matrices."""
         # Ensure first elements match
@@ -731,12 +743,15 @@ class TestStructuredMatrixGenerators:
                 for i2 in range(T.rows):
                     j2 = i2 - diff
                     if 0 <= j2 < T.cols:
-                        assert T.get(i, j) == T.get(i2, j2), \
+                        assert T.get(i, j) == T.get(i2, j2), (
                             f"Toeplitz property violated: ({i},{j}) != ({i2},{j2})"
+                        )
 
     @pytest.mark.property
-    @given(st.lists(st.integers(min_value=1, max_value=15), min_size=2, max_size=5),
-           st.integers(min_value=2, max_value=6))
+    @given(
+        st.lists(st.integers(min_value=1, max_value=15), min_size=2, max_size=5),
+        st.integers(min_value=2, max_value=6),
+    )
     def test_vandermonde_property_based(self, elements, n):
         """Property-based test for Vandermonde matrices."""
         V = vandermonde(elements, n)
@@ -854,8 +869,9 @@ class TestQuantumCodeGenerators:
         # Self-product should be symmetric
         for i in range(min(3, x_self_product.rows)):  # Test first few entries
             for j in range(min(3, x_self_product.cols)):
-                assert x_self_product.get(i, j) == x_self_product.get(j, i), \
+                assert x_self_product.get(i, j) == x_self_product.get(j, i), (
                     f"Self-product not symmetric at ({i},{j})"
+                )
 
     @pytest.mark.unit
     def test_surface_code_different_distances(self):
@@ -873,7 +889,8 @@ class TestQuantumCodeGenerators:
 
             # Count commutation errors
             non_zero_count = sum(
-                1 for i in range(product.rows) for j in range(product.cols) if product.get(i, j) != 0)
+                1 for i in range(product.rows) for j in range(product.cols) if product.get(i, j) != 0
+            )
             total_entries = product.rows * product.cols
             error_rate = non_zero_count / total_entries if total_entries > 0 else 0
 
@@ -963,7 +980,8 @@ class TestQuantumCodeGenerators:
 
         # Count commutation errors
         non_zero_count = sum(
-            1 for i in range(product.rows) for j in range(product.cols) if product.get(i, j) != 0)
+            1 for i in range(product.rows) for j in range(product.cols) if product.get(i, j) != 0
+        )
         total_entries = product.rows * product.cols
         error_rate = non_zero_count / total_entries if total_entries > 0 else 0
 
@@ -1200,8 +1218,9 @@ class TestQuantumCodeGenerators:
 
         for i in range(H.rows):
             row_weight = sum(H.get(i, j) for j in range(H.cols))
-            assert row_weight == expected_row_weight, \
+            assert row_weight == expected_row_weight, (
                 f"Row {i} has weight {row_weight}, expected {expected_row_weight}"
+            )
 
         # Test column weights (should be uniform due to circulant structure)
         col_weights = []
@@ -1260,7 +1279,8 @@ class TestQuantumCodeGenerators:
 
         # Count commutation errors
         non_zero_count = sum(
-            1 for i in range(product.rows) for j in range(product.cols) if product.get(i, j) != 0)
+            1 for i in range(product.rows) for j in range(product.cols) if product.get(i, j) != 0
+        )
         total_entries = product.rows * product.cols
         error_rate = non_zero_count / total_entries if total_entries > 0 else 0
 
@@ -1284,7 +1304,8 @@ class TestQuantumCodeGenerators:
 
         # Count commutation errors
         non_zero_count = sum(
-            1 for i in range(product.rows) for j in range(product.cols) if product.get(i, j) != 0)
+            1 for i in range(product.rows) for j in range(product.cols) if product.get(i, j) != 0
+        )
         total_entries = product.rows * product.cols
         error_rate = non_zero_count / total_entries if total_entries > 0 else 0
 

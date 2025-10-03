@@ -25,8 +25,9 @@ def _popcount_parity(x: int) -> int:
         return bin(x).count("1") % 2
 
 
-def add(A: SparseGF2Matrix | DenseGF2Matrix,
-        B: SparseGF2Matrix | DenseGF2Matrix) -> SparseGF2Matrix | DenseGF2Matrix:
+def add(
+    A: SparseGF2Matrix | DenseGF2Matrix, B: SparseGF2Matrix | DenseGF2Matrix
+) -> SparseGF2Matrix | DenseGF2Matrix:
     """
     Add two GF(2) matrices: C = A + B (XOR).
 
@@ -53,8 +54,9 @@ def add(A: SparseGF2Matrix | DenseGF2Matrix,
     return result
 
 
-def multiply(A: SparseGF2Matrix | DenseGF2Matrix,
-             B: SparseGF2Matrix | DenseGF2Matrix) -> SparseGF2Matrix | DenseGF2Matrix:
+def multiply(
+    A: SparseGF2Matrix | DenseGF2Matrix, B: SparseGF2Matrix | DenseGF2Matrix
+) -> SparseGF2Matrix | DenseGF2Matrix:
     """
     Multiply two GF(2) matrices: C = A * B.
 
@@ -298,7 +300,7 @@ def reduced_row_echelon_form(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[Spars
 def lu_decomposition(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[SparseGF2Matrix, SparseGF2Matrix]:
     """
     LU decomposition over GF(2) using Gaussian elimination.
-    
+
     Returns PLU decomposition where P is implicit (no pivoting for simplicity).
     For GF(2), we perform elimination without pivoting when possible.
 
@@ -335,7 +337,7 @@ def lu_decomposition(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[SparseGF2Matr
         for i in range(k + 1, n):
             if (U_rows[i] >> k) & 1:
                 # Record the elimination in L
-                L_rows[i] |= (1 << k)  # Set L[i,k] = 1
+                L_rows[i] |= 1 << k  # Set L[i,k] = 1
                 # Eliminate in U
                 U_rows[i] ^= U_rows[k]
 

@@ -51,7 +51,8 @@ def random_matrix(draw, rows=None, cols=None):
             ),
             min_size=0,
             max_size=num_ones,
-        ))
+        )
+    )
 
     for r, c in coordinates:
         matrix.set(r, c, 1)
@@ -226,8 +227,9 @@ def test_rank_nullity_theorem_property(dims):
     null_basis = nullspace(A)
     nullity = len(null_basis)
 
-    assert matrix_rank + nullity == cols, \
+    assert matrix_rank + nullity == cols, (
         f"Rank-nullity theorem failed: rank={matrix_rank}, nullity={nullity}, cols={cols}"
+    )
 
 
 @pytest.mark.property
@@ -260,8 +262,9 @@ def test_zero_matrix_nullspace_property(dims):
 
     # Verify each basis vector is in nullspace
     for basis_vector in null_basis:
-        assert verify_nullspace_vector(zero_matrix,
-                                       basis_vector), "Zero matrix nullspace vector verification failed"
+        assert verify_nullspace_vector(zero_matrix, basis_vector), (
+            "Zero matrix nullspace vector verification failed"
+        )
 
 
 @pytest.mark.property
@@ -512,12 +515,14 @@ def test_nullspace_completeness_property(dims):
     matrix_rank = rank(A)
     expected_nullity = cols - matrix_rank
 
-    assert len(null_basis) == expected_nullity, \
+    assert len(null_basis) == expected_nullity, (
         f"Nullspace basis size {len(null_basis)} should equal expected nullity {expected_nullity}"
+    )
 
     # If nullspace is non-trivial, verify linear combinations are also in nullspace
     if len(null_basis) >= 2:
         # Test that sum of first two basis vectors is in nullspace
         combined_vector = [(null_basis[0][i] ^ null_basis[1][i]) for i in range(cols)]
-        assert verify_nullspace_vector(A, combined_vector), \
+        assert verify_nullspace_vector(A, combined_vector), (
             "Linear combination of nullspace vectors should be in nullspace"
+        )

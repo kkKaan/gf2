@@ -62,7 +62,8 @@ def random_matrix(draw, rows=None, cols=None):
             ),
             min_size=0,
             max_size=num_ones,
-        ))
+        )
+    )
 
     for r, c in coordinates:
         matrix.set(r, c, 1)
@@ -214,8 +215,9 @@ def test_rank_nullity_theorem_verification(dims):
 
     matrix_rank, nullity, num_cols = rank_nullity_theorem(A)
 
-    assert matrix_rank + nullity == num_cols, \
+    assert matrix_rank + nullity == num_cols, (
         f"Rank-nullity theorem failed: {matrix_rank} + {nullity} != {num_cols}"
+    )
 
 
 @pytest.mark.property
@@ -246,8 +248,9 @@ def test_nullspace_basis_properties(dims):
     # Verify nullity matches basis size
     expected_nullity = len(null_basis)
     matrix_rank = rank(A)
-    assert matrix_rank + expected_nullity == A.cols, \
+    assert matrix_rank + expected_nullity == A.cols, (
         "Nullspace basis size inconsistent with rank-nullity theorem"
+    )
 
 
 @pytest.mark.property

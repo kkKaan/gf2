@@ -388,10 +388,12 @@ class SparseGF2Matrix:
 
     def __repr__(self):
         stats = self.memory_usage()
-        return (f"SparseGF2Matrix({self.rows}x{self.cols}, "
-                f"nnz={stats.nnz}, density={stats.density:.3f}, "
-                f"format={self.format}, memory={stats.memory_bytes}B, "
-                f"compression={stats.compression_ratio:.1f}x)")
+        return (
+            f"SparseGF2Matrix({self.rows}x{self.cols}, "
+            f"nnz={stats.nnz}, density={stats.density:.3f}, "
+            f"format={self.format}, memory={stats.memory_bytes}B, "
+            f"compression={stats.compression_ratio:.1f}x)"
+        )
 
 
 class DenseGF2Matrix:
@@ -463,10 +465,9 @@ class DenseGF2Matrix:
         memory_bytes = self.data.nbytes
         compression_ratio = (self.rows * self.cols) / memory_bytes if memory_bytes > 0 else 1.0
 
-        return SparseStats(nnz=exact_nnz,
-                           density=density,
-                           memory_bytes=memory_bytes,
-                           compression_ratio=compression_ratio)
+        return SparseStats(
+            nnz=exact_nnz, density=density, memory_bytes=memory_bytes, compression_ratio=compression_ratio
+        )
 
 
 def create_sparse_matrix(

@@ -246,7 +246,7 @@ def test_nullspace_bitwise_consistency():
         sol_vec = [int(bit) for bit in sol_str]
 
         # Verify it's in the nullspace (unless it's the zero vector)
-        if any(bit == '1' for bit in sol_str):
+        if any(bit == "1" for bit in sol_str):
             assert MathVerifier.verify_nullspace_vector(A, sol_vec)
 
     except ValueError:
@@ -390,7 +390,7 @@ def test_rank_nullity_theorem_function():
         identity(5),
         zeros(3, 4),
         random_sparse(4, 6, 0.3, seed=42),
-        random_sparse(6, 4, 0.4, seed=43)
+        random_sparse(6, 4, 0.4, seed=43),
     ]
 
     for A in matrices_to_test:
@@ -572,6 +572,7 @@ def test_solve_identity_property(n):
 
     # Generate random binary vector
     import random
+
     random.seed(42)
     b = [random.randint(0, 1) for _ in range(n)]
 

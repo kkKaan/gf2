@@ -50,10 +50,14 @@ def random_matrix(draw, rows=None, cols=None):
     # Generate random coordinates for 1s
     num_ones = draw(st.integers(min_value=0, max_value=min(rows * cols, 20)))
     coordinates = draw(
-        st.sets(st.tuples(st.integers(min_value=0, max_value=rows - 1),
-                          st.integers(min_value=0, max_value=cols - 1)),
-                min_size=0,
-                max_size=num_ones))
+        st.sets(
+            st.tuples(
+                st.integers(min_value=0, max_value=rows - 1), st.integers(min_value=0, max_value=cols - 1)
+            ),
+            min_size=0,
+            max_size=num_ones,
+        )
+    )
 
     for r, c in coordinates:
         matrix.set(r, c, 1)
