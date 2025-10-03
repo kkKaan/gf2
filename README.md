@@ -115,30 +115,3 @@ mypy binpy/           # Type checking
 # Install pre-commit hooks
 pre-commit install
 ```
-
-## Roadmap
-
-- **v0.2**: Performance benchmarks, additional decompositions
-- **v0.3**: Quantum error correction utilities, GPU acceleration
-- **v1.0**: Stable API, comprehensive documentation
-
-## Contributing
-
-Contributions welcome! Please read our [Contributing Guide](CONTRIBUTING.md) and submit pull requests.
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Citation
-
-If you use binpy in research, please cite:
-
-```bibtex
-@software{binpy2024,
-  title={binpy: High-performance binary matrix operations for Python},
-  author={binpy authors},
-  year={2024},
-  url={https://github.com/kkkaan/binpy}
-}
-```
