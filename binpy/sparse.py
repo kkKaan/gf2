@@ -65,6 +65,9 @@ class SparseGF2Matrix:
         self.bitpacked_rows: np.ndarray | None = None
         self.structured_params: dict | None = None
 
+        # OPTIMIZATION: Cache for packed row representation
+        self._packed_rows_cache: list[int] | None = None
+
         if data is not None:
             self._load_data(data, format_hint)
 
@@ -197,11 +200,26 @@ class SparseGF2Matrix:
             current = int(self.bitpacked_rows[row, word_idx])
             self.bitpacked_rows[row, word_idx] = current | (1 << bit_idx)
 
+    def get_all_rows_bitwise(self) -> list[int]:
+        """
+        Get all rows as packed integers (cached for performance).
+
+        Returns:
+            List of packed row integers
+        """
+        if self._packed_rows_cache is None:
+            self._packed_rows_cache = [self.get_row_bitwise(i) for i in range(self.rows)]
+        return self._packed_rows_cache
+
     def get_row_bitwise(self, row_idx: int) -> int:
         """
         Get row as packed integer for bitwise operations.
         Optimized for your existing bitwise algorithms.
         """
+        # OPTIMIZATION: Use cache if available
+        if self._packed_rows_cache is not None:
+            return self._packed_rows_cache[row_idx]
+
         if self.format == "bitpacked":
             # Already bit-packed, just need to combine words
             if self.bitpacked_rows is None:
@@ -254,6 +272,9 @@ class SparseGF2Matrix:
         else:
             self.format = "bitpacked"
             self._packed_to_bitpacked(packed_rows)
+
+        # OPTIMIZATION: Cache the packed rows immediately
+        self._packed_rows_cache = packed_rows[:]
 
     def _packed_to_csr(self, packed_rows: list[int]):
         """Convert packed rows to CSR format."""

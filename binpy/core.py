@@ -124,11 +124,30 @@ def transpose(A: SparseGF2Matrix | DenseGF2Matrix) -> SparseGF2Matrix | DenseGF2
     return result
 
 
-def rank(A: SparseGF2Matrix | DenseGF2Matrix) -> int:
+def rank(A: SparseGF2Matrix | DenseGF2Matrix | list[int], n_cols: int | None = None) -> int:
     """
     Compute rank of GF(2) matrix using optimized Gaussian elimination.
+
+    Args:
+        A: Matrix object or list of packed row integers (fast path)
+        n_cols: Number of columns (required if A is list[int])
+
+    Returns:
+        Rank of the matrix
     """
-    rows = [A.get_row_bitwise(i) for i in range(A.rows)]
+    # OPTIMIZATION: Fast path for direct packed input
+    if isinstance(A, list):
+        if n_cols is None:
+            raise ValueError("n_cols required when A is list[int]")
+        return _rank_bitwise(A, n_cols)
+
+    # OPTIMIZATION: Use cached rows if available (SparseGF2Matrix)
+    if hasattr(A, "get_all_rows_bitwise"):
+        rows = A.get_all_rows_bitwise()
+    else:
+        # Fallback: extract rows one by one
+        rows = [A.get_row_bitwise(i) for i in range(A.rows)]
+
     return _rank_bitwise(rows, A.cols)
 
 
@@ -153,9 +172,10 @@ def _rank_bitwise(rows: list[int], n_cols: int) -> int:
         if pivot_row != rank_count:
             A[rank_count], A[pivot_row] = A[pivot_row], A[rank_count]
 
-        # Eliminate
-        for i in range(len(A)):
-            if i != rank_count and (A[i] >> col) & 1:
+        # OPTIMIZATION: Only eliminate below pivot (forward elimination)
+        # This is sufficient for rank computation and 2× faster
+        for i in range(rank_count + 1, len(A)):
+            if (A[i] >> col) & 1:
                 A[i] ^= A[rank_count]
 
         rank_count += 1
@@ -240,9 +260,17 @@ def is_invertible(A: SparseGF2Matrix | DenseGF2Matrix) -> bool:
     return rank(A) == A.rows
 
 
-def gaussian_elimination_inplace(rows: list[int], n_cols: int) -> tuple[list[int], list[int]]:
+def gaussian_elimination_inplace(
+    rows: list[int], n_cols: int, full_reduction: bool = True
+) -> tuple[list[int], list[int]]:
     """
     Perform Gaussian elimination in-place and return pivot columns.
+
+    Args:
+        rows: List of packed row integers
+        n_cols: Number of columns
+        full_reduction: If True, compute RREF (eliminate above and below).
+                       If False, only forward elimination (eliminate below only).
 
     Returns:
         (reduced_rows, pivot_columns)
@@ -267,10 +295,17 @@ def gaussian_elimination_inplace(rows: list[int], n_cols: int) -> tuple[list[int
 
         pivot_cols.append(col)
 
-        # Eliminate
-        for i in range(len(rows)):
-            if i != rank_count and (rows[i] >> col) & 1:
-                rows[i] ^= rows[rank_count]
+        # OPTIMIZATION: Choose elimination strategy
+        if full_reduction:
+            # Full RREF: eliminate above and below (needed for nullspace, solve, etc.)
+            for i in range(len(rows)):
+                if i != rank_count and (rows[i] >> col) & 1:
+                    rows[i] ^= rows[rank_count]
+        else:
+            # Forward elimination only: eliminate below (sufficient for rank)
+            for i in range(rank_count + 1, len(rows)):
+                if (rows[i] >> col) & 1:
+                    rows[i] ^= rows[rank_count]
 
         rank_count += 1
 
