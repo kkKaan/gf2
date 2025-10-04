@@ -84,20 +84,23 @@ class SparseGF2Matrix:
 
     def _from_dense(self, matrix: list[list[int]], format_hint: str):
         """Convert from dense matrix representation."""
-        # Count non-zeros and analyze structure
-        self.nnz = sum(sum(row) for row in matrix)
-        density = self.nnz / (self.rows * self.cols) if self.rows * self.cols > 0 else 0
+        # OPTIMIZATION: Skip format detection if hint provided
+        if format_hint != "auto":
+            self.format = format_hint
+            # Quick nnz count
+            self.nnz = sum(sum(row) for row in matrix)
+        else:
+            # Count non-zeros and analyze structure
+            self.nnz = sum(sum(row) for row in matrix)
+            density = self.nnz / (self.rows * self.cols) if self.rows * self.cols > 0 else 0
 
-        # Select optimal format
-        if format_hint == "auto":
+            # Select optimal format
             if density < 0.01:  # Very sparse
                 self.format = "csr_compact"
             elif density < 0.5:  # Moderately sparse
                 self.format = "csr"
             else:  # Dense
                 self.format = "bitpacked"
-        else:
-            self.format = format_hint
 
         # Convert to selected format
         if self.format == "csr" or self.format == "csr_compact":
@@ -146,18 +149,30 @@ class SparseGF2Matrix:
 
     def _to_bitpacked(self, matrix: list[list[int]]):
         """Convert to bit-packed dense format."""
-        # Pack each row into integers (64 bits per integer)
+        # OPTIMIZATION: Use fast row packing with Python integers first
         words_per_row = (self.cols + 63) // 64
         self.bitpacked_rows = np.zeros((self.rows, words_per_row), dtype=np.uint64)
 
+        # OPTIMIZATION: Build packed rows cache at the same time
+        packed_cache = []
+
         for i, row in enumerate(matrix):
+            # Pack entire row into Python integer first
+            row_packed = 0
             for j, val in enumerate(row):
                 if val & 1:
-                    word_idx = j // 64
-                    bit_idx = j % 64
-                    # Use Python int arithmetic to avoid numpy in-place ufunc casting issues
-                    current = int(self.bitpacked_rows[i, word_idx])
-                    self.bitpacked_rows[i, word_idx] = current | (1 << bit_idx)
+                    row_packed |= 1 << j
+
+            packed_cache.append(row_packed)
+
+            # Then split into 64-bit words for storage
+            for word_idx in range(words_per_row):
+                shift = word_idx * 64
+                word_bits = (row_packed >> shift) & 0xFFFFFFFFFFFFFFFF
+                self.bitpacked_rows[i, word_idx] = word_bits
+
+        # Cache the packed rows for fast access
+        self._packed_rows_cache = packed_cache
 
     def _coo_to_csr(self, row_indices: list[int], col_indices: list[int]):
         """Convert coordinate format to CSR."""

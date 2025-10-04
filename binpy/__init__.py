@@ -34,6 +34,8 @@ __all__ = [
     # Linear systems
     "solve",
     "nullspace",
+    "nullspace_bitwise",
+    "nullspace_fast",
     "inverse",
     "lu_decomposition",
     "least_squares",

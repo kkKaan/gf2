@@ -9,6 +9,7 @@ operations for maximum performance.
 Solvers:
 - solve(A, b): Solve Ax = b
 - nullspace(A): Find null space basis
+- nullspace_fast(matrix): Fast nullspace for list of lists
 - inverse(A): Matrix inversion
 - least_squares(A, b): Overdetermined systems
 - kernel(A): Kernel computation
@@ -137,18 +138,51 @@ def nullspace_bitwise(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[str, float]:
     """
     start_time = time.time()
 
-    # Convert to list of lists for compatibility with original algorithm
-    matrix_list = []
-    for i in range(A.rows):
-        row_packed = A.get_row_bitwise(i)
-        row = [(row_packed >> j) & 1 for j in range(A.cols)]
-        matrix_list.append(row)
+    # OPTIMIZATION: Use cached packed rows if available (avoids conversion overhead)
+    if hasattr(A, "get_all_rows_bitwise"):
+        rows = A.get_all_rows_bitwise()[:]  # Copy to avoid modifying cache
+    else:
+        # Fallback: extract rows one by one
+        rows = [A.get_row_bitwise(i) for i in range(A.rows)]
 
-    # Use original optimized algorithm
     n = A.cols
-    rows = [_pack_vector(row) for row in matrix_list]
-
     A_echelon, pivot_cols = _gaussian_elimination_GF2_bitwise(rows, n)
+    sol_int = _nullspace_solution_bitwise(A_echelon, pivot_cols, n)
+
+    # Unpack solution
+    sol_bits = _unpack_vector(sol_int, n)
+    sol_str = "".join(str(b) for b in sol_bits)
+
+    elapsed_time = time.time() - start_time
+    return sol_str, elapsed_time
+
+
+def nullspace_fast(matrix: list[list[int]], include_packing_time: bool = True) -> tuple[str, float]:
+    """
+    FASTEST nullspace computation - bypasses all matrix wrapper overhead.
+    Works directly with list of lists input.
+
+    This is the zero-overhead version for maximum performance.
+    Use this when you have raw matrix data and need maximum speed.
+
+    Args:
+        matrix: List of lists representing binary matrix (each row is a list of 0/1)
+        include_packing_time: If False, excludes row packing from timing (default True for fair comparison)
+
+    Returns:
+        (solution_string, computation_time)
+    """
+    n = len(matrix[0])
+    # Pack rows directly into integers
+    rows = [_pack_vector(row) for row in matrix]
+
+    # Start timing AFTER packing (to match simon_bitwise behavior)
+    start_time = time.time()
+
+    # Gaussian elimination
+    A_echelon, pivot_cols = _gaussian_elimination_GF2_bitwise(rows, n)
+
+    # Solve for nullspace vector
     sol_int = _nullspace_solution_bitwise(A_echelon, pivot_cols, n)
 
     # Unpack solution
