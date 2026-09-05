@@ -9,7 +9,10 @@ description = "High-performance binary (GF(2)) matrix operations for Python"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
-  { name = "Kaan Karaçanta", email = "kaan.karacanta@gmail.com" }
+  # No email: an address here is published in the package metadata and
+  # rendered as a mailto: link on the project page. Contact goes through
+  # the Issues URL below instead.
+  { name = "Kaan Karaçanta" }
 ]
 requires-python = ">=3.10"
 dependencies = [
