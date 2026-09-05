@@ -43,8 +43,12 @@ test = [
   "memory-profiler>=0.60",  # Memory profiling
 ]
 dev = [
-  "ruff>=0.5",
-  "mypy>=1.10", 
+  # Pinned exactly, not lower-bounded. A linter/formatter resolved by ">=" makes
+  # CI's target move without a commit: ruff 0.16 began formatting Python blocks
+  # inside Markdown, so a README that passed locally under 0.12 failed CI under
+  # 0.16. Keep these in lockstep with .pre-commit-config.yaml.
+  "ruff==0.16.6",
+  "mypy==2.3.1",
   "pre-commit>=3.7",
 ]
 docs = [

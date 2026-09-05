@@ -26,29 +26,29 @@ pip install -e ".[dev,test]"
 import gf2
 
 # Create matrices
-A = gf2.identity(5)                    # 5x5 identity matrix
+A = gf2.identity(5)  # 5x5 identity matrix
 B = gf2.random_sparse(5, 5, density=0.3)  # Random sparse matrix
-C = gf2.zeros(3, 4)                    # 3x4 zero matrix
+C = gf2.zeros(3, 4)  # 3x4 zero matrix
 
 # Basic operations (all in GF(2))
-sum_matrix = gf2.add(A, B)             # XOR addition
-product = gf2.multiply(A, B)           # Binary matrix multiplication  
-A_transpose = gf2.transpose(A)         # Matrix transpose
+sum_matrix = gf2.add(A, B)  # XOR addition
+product = gf2.multiply(A, B)  # Binary matrix multiplication
+A_transpose = gf2.transpose(A)  # Matrix transpose
 
 # Linear algebra
-r = gf2.rank(A)                        # Matrix rank
-det_A = gf2.det(A)                     # Determinant (0 or 1)
-is_inv = gf2.is_invertible(A)          # Invertibility check
+r = gf2.rank(A)  # Matrix rank
+det_A = gf2.det(A)  # Determinant (0 or 1)
+is_inv = gf2.is_invertible(A)  # Invertibility check
 
 # Solve linear systems Ax = b over GF(2)
 b = [1, 0, 1, 0, 1]
-x = gf2.solve(A, b)                    # Exact solution
-null_space = gf2.nullspace(A)          # Null space basis
+x = gf2.solve(A, b)  # Exact solution
+null_space = gf2.nullspace(A)  # Null space basis
 
 # Matrix generators for coding theory
-H = gf2.hamming_matrix(3)              # Hamming code parity check
+H = gf2.hamming_matrix(3)  # Hamming code parity check
 ldpc = gf2.ldpc_matrix(100, 200, row_weight=3)  # LDPC code
-circ = gf2.circulant([1, 0, 1, 1])     # Circulant matrix
+circ = gf2.circulant([1, 0, 1, 1])  # Circulant matrix
 ```
 
 ## Advanced Usage
@@ -57,14 +57,14 @@ circ = gf2.circulant([1, 0, 1, 1])     # Circulant matrix
 
 ```python
 # Create from coordinates
-coords = [(0, 1), (1, 2), (2, 0)]  # (row, col) positions  
+coords = [(0, 1), (1, 2), (2, 0)]  # (row, col) positions
 matrix = gf2.create_sparse_matrix(3, 3, coordinates=coords)
 
 # Different storage formats are automatically chosen
-dense_like = gf2.random_sparse(10, 10, density=0.8)   # Uses bit-packed storage
+dense_like = gf2.random_sparse(10, 10, density=0.8)  # Uses bit-packed storage
 very_sparse = gf2.random_sparse(1000, 1000, density=0.01)  # Uses CSR
 
-# Access internal representation  
+# Access internal representation
 print(matrix.memory_usage())  # Shows compression statistics
 ```
 
@@ -72,10 +72,10 @@ print(matrix.memory_usage())  # Shows compression statistics
 
 ```python
 # Generate LDPC codes
-H = gf2.ldpc_matrix(m=500, n=1000, row_weight=6, method="progressive") 
+H = gf2.ldpc_matrix(m=500, n=1000, row_weight=6, method="progressive")
 
 # Classical codes
-hamming_H = gf2.hamming_matrix(r=4)    # [15,11,3] Hamming code
+hamming_H = gf2.hamming_matrix(r=4)  # [15,11,3] Hamming code
 bch_H = gf2.bch_matrix(n=15, k=7, t=2)  # BCH code (simplified)
 
 # Structured matrices
@@ -172,9 +172,9 @@ Example using `nullspace_fast` directly on list-of-lists:
 from gf2 import nullspace_fast
 
 matrix = [
-    [1,0,1,0,1],
-    [0,1,1,0,0],
-    [1,1,0,1,0],  # use n-1 rows for underdetermined system
+    [1, 0, 1, 0, 1],
+    [0, 1, 1, 0, 0],
+    [1, 1, 0, 1, 0],  # use n-1 rows for underdetermined system
 ]
 
 solution_bits, elapsed = nullspace_fast(matrix)

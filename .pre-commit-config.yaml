@@ -1,7 +1,7 @@
 repos:
   # Ruff handles linting, formatting, import sorting, and more
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.5.7
+    rev: v0.16.6  # keep in lockstep with pyproject [dev]
     hooks:
       - id: ruff
         args: ["--fix", "--exit-non-zero-on-fix"]
@@ -9,7 +9,7 @@ repos:
   
   # Type checking with mypy
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.11.1
+    rev: v2.3.1  # keep in lockstep with pyproject [dev]
     hooks:
       - id: mypy
         additional_dependencies: ["numpy>=1.23"]

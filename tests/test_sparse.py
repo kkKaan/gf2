@@ -1312,33 +1312,48 @@ class TestPerformanceAndScalability:
 
     @pytest.mark.performance
     def test_format_selection_performance(self):
-        """Test that format selection doesn't significantly impact creation time."""
+        """Automatic format selection must not add meaningful build cost.
+
+        The overhead being measured is one density calculation, so it is tiny
+        next to the build itself and easily swamped by measurement noise. The
+        comparison therefore warms both paths up first and takes the minimum of
+        several runs; timing a single cold call against a single warm one made
+        this test fail on CI at a 5x ratio purely because the cold call ran
+        first. See benchmarks/README.md for the same rules applied to the
+        benchmark suite.
+        """
         import time
 
-        # Test creation time for different sizes
-        sizes = [100, 500, 1000]
+        def best_of(build, repeats=5):
+            build()  # warm up: allocator, CPU caches, branch predictors
+            return min(
+                (lambda start: (build(), time.perf_counter() - start)[1])(time.perf_counter())
+                for _ in range(repeats)
+            )
 
-        for size in sizes:
+        for size in [100, 500, 1000]:
             coords = [(i, j) for i in range(size) for j in range(size) if (i + j) % 50 == 0]
             row_indices = [coord[0] for coord in coords]
             col_indices = [coord[1] for coord in coords]
 
-            # Time auto format selection
-            start_time = time.perf_counter()
+            # Default args bind this iteration's values into the closures;
+            # a bare lambda would read whatever the loop variables hold later.
+            def build(hint, size=size, rows=row_indices, cols=col_indices):
+                return SparseGF2Matrix(size, size, (rows, cols), hint)
+
+            auto_time = best_of(lambda: build("auto"))
+            explicit_time = best_of(lambda: build("csr"))
+
+            assert auto_time < explicit_time * 2, (
+                f"size {size}: auto {auto_time * 1000:.3f} ms vs explicit {explicit_time * 1000:.3f} ms"
+            )
+
+            # The two paths must also agree on content, not just on speed.
             auto_matrix = SparseGF2Matrix(size, size, (row_indices, col_indices), "auto")
-            auto_time = time.perf_counter() - start_time
-
-            # Time explicit format selection
-            start_time = time.perf_counter()
             explicit_matrix = SparseGF2Matrix(size, size, (row_indices, col_indices), "csr")
-            explicit_time = time.perf_counter() - start_time
-
-            # Auto selection shouldn't be significantly slower
-            assert auto_time < explicit_time * 2  # Allow 2x overhead for format analysis
-
-            # Both should produce valid matrices
             assert auto_matrix.memory_usage().nnz > 0
             assert explicit_matrix.memory_usage().nnz > 0
+            assert auto_matrix.get_all_rows_bitwise() == explicit_matrix.get_all_rows_bitwise()
 
     @pytest.mark.performance
     def test_bitwise_operation_performance(self):
