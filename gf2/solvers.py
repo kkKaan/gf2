@@ -17,6 +17,7 @@ Solvers:
 """
 
 import time
+from typing import NamedTuple
 
 import numpy as np
 
@@ -107,7 +108,26 @@ def nullspace(A: SparseGF2Matrix | DenseGF2Matrix) -> list[list[int]]:
     return basis
 
 
-def nullspace_bitwise(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[str, float]:
+class NullspaceVector(NamedTuple):
+    """One null-space vector plus how long finding it took.
+
+    Unpacks as ``(bits, seconds)``. The second element being a duration is
+    surprising enough on its own that naming it is worth the class.
+
+    Attributes:
+        bits: The vector as a binary string, least significant column first, so
+            ``bits[j]`` is the value of variable j.
+        seconds: Wall-clock duration of this single call, from
+            ``time.perf_counter``. A convenience for interactive use only --
+            one untimed-warmup sample is not a benchmark. Use
+            ``benchmarks/harness.py`` for measurement.
+    """
+
+    bits: str
+    seconds: float
+
+
+def nullspace_bitwise(A: SparseGF2Matrix | DenseGF2Matrix) -> NullspaceVector:
     """
     Optimized nullspace computation returning single solution as bit string.
     This is the original algorithm from Simon's algorithm postprocessing.
@@ -128,10 +148,10 @@ def nullspace_bitwise(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[str, float]:
     sol_str = "".join(str(b) for b in sol_bits)
 
     elapsed_time = time.perf_counter() - start_time
-    return sol_str, elapsed_time
+    return NullspaceVector(sol_str, elapsed_time)
 
 
-def nullspace_fast(matrix: list[list[int]], include_packing_time: bool = True) -> tuple[str, float]:
+def nullspace_fast(matrix: list[list[int]], include_packing_time: bool = True) -> NullspaceVector:
     """
     FASTEST nullspace computation - bypasses all matrix wrapper overhead.
     Works directly with list of lists input.
@@ -174,7 +194,7 @@ def nullspace_fast(matrix: list[list[int]], include_packing_time: bool = True) -
     sol_str = "".join(str(b) for b in sol_bits)
 
     elapsed_time = time.perf_counter() - start_time
-    return sol_str, elapsed_time
+    return NullspaceVector(sol_str, elapsed_time)
 
 
 def _pack_vector(vec):
@@ -363,12 +383,24 @@ def image(A: SparseGF2Matrix | DenseGF2Matrix) -> list[list[int]]:
     return [_unpack_vector(row, AT.cols) for row in rref_rows if row]
 
 
-def rank_nullity_theorem(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[int, int, int]:
+class RankNullity(NamedTuple):
+    """Result of :func:`rank_nullity_theorem`, where ``rank + nullity == columns``.
+
+    Unpacks as ``(rank, nullity, columns)``. Three bare integers in a row is
+    exactly the shape a caller mis-orders, so they are named.
+    """
+
+    rank: int
+    nullity: int
+    columns: int
+
+
+def rank_nullity_theorem(A: SparseGF2Matrix | DenseGF2Matrix) -> RankNullity:
     """
     Verify rank-nullity theorem: rank(A) + nullity(A) = cols(A).
 
     Returns:
-        (rank, nullity, columns)
+        A :class:`RankNullity` of ``(rank, nullity, columns)``.
     """
     from .core import rank
 
@@ -376,7 +408,7 @@ def rank_nullity_theorem(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[int, int,
     null_basis = nullspace(A)
     nullity = len(null_basis)
 
-    return matrix_rank, nullity, A.cols
+    return RankNullity(matrix_rank, nullity, A.cols)
 
 
 def solve_multiple_rhs(

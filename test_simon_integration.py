@@ -286,7 +286,7 @@ def test_consistency():
 def main():
     """Run all integration tests."""
     print("=" * 80)
-    print("BINPY SIMON'S ALGORITHM INTEGRATION TESTS")
+    print("gf2 SIMON'S ALGORITHM INTEGRATION TESTS")
     print("=" * 80)
 
     all_passed = True

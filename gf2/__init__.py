@@ -14,6 +14,8 @@ Quick start:
     8
 """
 
+from importlib import metadata as _metadata
+
 from .core import *
 from .generators import *
 from .solvers import *
@@ -54,10 +56,14 @@ __all__ = [
     "circulant",
     "circulant_random",
     "toeplitz",
-    "vandermonde",
     "ldpc_matrix",
     "hamming_matrix",
-    "bch_matrix",
+    "repetition_matrix",
+    # Quantum error-correcting code constructions
+    "surface_code_matrix",
+    "hypergraph_product",
+    "css_code_matrix",
+    "bicycle_codes",
     # Advanced properties
     "reduced_row_echelon_form",
     "matrix_power",
@@ -65,8 +71,17 @@ __all__ = [
     "minimal_polynomial",
     "matrix_norm",
     "condition_number",
-    # Factory
+    # Factory and storage statistics
     "create_sparse_matrix",
+    "SparseStats",
+    # Structured results returned by the operations above
+    "LUDecomposition",
+    "RowEchelonForm",
+    "NullspaceVector",
+    "RankNullity",
 ]
 
-__version__ = "0.1.0"
+try:  # keep one source of truth: the version declared in pyproject.toml
+    __version__ = _metadata.version("gf2")
+except _metadata.PackageNotFoundError:  # running from a source tree, not installed
+    __version__ = "0.0.0+unknown"

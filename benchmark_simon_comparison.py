@@ -220,7 +220,7 @@ def get_secret_integer_generic_simon(matrix, mod=None):
 
 
 ###############################################
-# Binpy wrapper functions
+# gf2 wrapper functions
 ###############################################
 
 
@@ -333,7 +333,7 @@ def measure_memory_and_time(func, matrix):
 def run_benchmark():
     """Run comprehensive benchmark comparing all implementations."""
     print("=" * 80)
-    print("BINPY vs SIMON_AMAZON_TEST.PY PERFORMANCE BENCHMARK")
+    print("gf2 vs SIMON_AMAZON_TEST.PY PERFORMANCE BENCHMARK")
     print("=" * 80)
     print()
 

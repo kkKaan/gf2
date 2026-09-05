@@ -21,6 +21,18 @@ import numpy as np
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+# The packed representation is defined as little-endian, not native-endian.
+#
+# Every conversion between a Python int and the packed array goes through raw
+# bytes, and the Python side is necessarily explicit about order
+# (``int.to_bytes(..., "little")``). Pairing that with a NATIVE-order array is
+# correct only by accident of running on a little-endian host: on a big-endian
+# one (numpy ships s390x wheels) a single set bit in word 0 reads back as 2**56,
+# and ``unpackbits`` on a ``view(uint8)`` returns the bits of the wrong byte.
+# Pinning the storage dtype makes the layout the same everywhere. On a
+# little-endian host "<u8" IS the native dtype, so this costs nothing.
+_U64 = np.dtype("<u8")
+
 
 def _int_from_words(words: np.ndarray) -> int:
     """Concatenate little-endian uint64 words into one Python int.
@@ -28,6 +40,11 @@ def _int_from_words(words: np.ndarray) -> int:
     ``int.from_bytes`` does this in C. Building it with a ``|=`` loop is
     quadratic in the word count because each step reallocates the whole int.
     """
+    # astype is a no-op copy when the array is already little-endian, which it
+    # is for every array this package creates; the branch only pays on a
+    # big-endian host, where it is the difference between right and wrong.
+    if words.dtype.byteorder not in ("<", "=", "|"):
+        words = words.astype(_U64)
     return int.from_bytes(words.tobytes(), "little")
 
 
@@ -196,7 +213,7 @@ class SparseGF2Matrix:
         """Convert to bit-packed dense format."""
         # OPTIMIZATION: Use fast row packing with Python integers first
         words_per_row = (self.cols + 63) // 64
-        self.bitpacked_rows = np.zeros((self.rows, words_per_row), dtype=np.uint64)
+        self.bitpacked_rows = np.zeros((self.rows, words_per_row), dtype=_U64)
 
         # OPTIMIZATION: Build packed rows cache at the same time
         packed_cache = []
@@ -214,7 +231,7 @@ class SparseGF2Matrix:
             dense.reshape(self.rows, words_per_row * 8, 8)[:, :, ::-1].reshape(self.rows, -1),
             axis=1,
         )
-        self.bitpacked_rows = np.ascontiguousarray(packed.view(np.uint64))
+        self.bitpacked_rows = np.ascontiguousarray(packed.view(_U64))
         packed_cache = [_int_from_words(self.bitpacked_rows[i]) for i in range(self.rows)]
 
         # Cache the packed rows for fast access
@@ -252,7 +269,7 @@ class SparseGF2Matrix:
     def _coo_to_bitpacked(self, row_indices: list[int], col_indices: list[int]):
         """Convert coordinate format to bit-packed."""
         words_per_row = (self.cols + 63) // 64
-        self.bitpacked_rows = np.zeros((self.rows, words_per_row), dtype=np.uint64)
+        self.bitpacked_rows = np.zeros((self.rows, words_per_row), dtype=_U64)
 
         for row, col in zip(row_indices, col_indices, strict=False):
             word_idx = col // 64
@@ -363,14 +380,14 @@ class SparseGF2Matrix:
     def _packed_to_bitpacked(self, packed_rows: list[int]):
         """Convert packed rows to bit-packed format."""
         words_per_row = (self.cols + 63) // 64
-        self.bitpacked_rows = np.zeros((self.rows, words_per_row), dtype=np.uint64)
+        self.bitpacked_rows = np.zeros((self.rows, words_per_row), dtype=_U64)
 
         nbytes = words_per_row * 8
         for i, row_val in enumerate(packed_rows):
             row_val = int(row_val)
             # to_bytes slices the integer in one C pass; the previous loop
             # shifted the full-width integer once per word, which is quadratic.
-            self.bitpacked_rows[i] = np.frombuffer(row_val.to_bytes(nbytes, "little"), dtype=np.uint64)
+            self.bitpacked_rows[i] = np.frombuffer(row_val.to_bytes(nbytes, "little"), dtype=_U64)
 
     def memory_usage(self) -> SparseStats:
         """Calculate memory usage statistics."""
@@ -492,15 +509,33 @@ class SparseGF2Matrix:
             and self.bitpacked_rows.shape[1] == words
         ):
             return self.bitpacked_rows
-        out = np.zeros((self.rows, max(words, 1)), dtype=np.uint64)
+        out = np.zeros((self.rows, max(words, 1)), dtype=_U64)
         nbytes = max(words, 1) * 8
         for i, value in enumerate(self.get_all_rows_bitwise()):
-            out[i] = np.frombuffer(int(value).to_bytes(nbytes, "little"), dtype=np.uint64)
+            out[i] = np.frombuffer(int(value).to_bytes(nbytes, "little"), dtype=_U64)
         return out
 
     def invalidate_cache(self) -> None:
         """Drop the packed-row cache. Call after mutating the backing store."""
         self._packed_rows_cache = None
+
+    def __eq__(self, other: object) -> bool:
+        """Structural equality: same shape and same bits.
+
+        Without this, ``A == B`` fell back to identity and quietly returned
+        False for two matrices holding identical data - the kind of comparison
+        a caller writes without thinking twice. Equality deliberately ignores
+        the storage format, since CSR and bit-packed are two encodings of the
+        same matrix.
+        """
+        if not isinstance(other, SparseGF2Matrix | DenseGF2Matrix):
+            return NotImplemented
+        if (self.rows, self.cols) != (other.rows, other.cols):
+            return False
+        return self.get_all_rows_bitwise() == [other.get_row_bitwise(i) for i in range(other.rows)]
+
+    # Defining __eq__ sets __hash__ to None, which is correct here: these
+    # matrices are mutable through set_bit, so hashing them would be unsound.
 
     def __repr__(self):
         stats = self.memory_usage()
@@ -524,7 +559,7 @@ class DenseGF2Matrix:
 
         # Pack into 64-bit words
         self.words_per_row = (cols + 63) // 64
-        self.data = np.zeros((rows, self.words_per_row), dtype=np.uint64)
+        self.data = np.zeros((rows, self.words_per_row), dtype=_U64)
 
         if data is not None:
             self._load_data(data)
@@ -570,6 +605,20 @@ class DenseGF2Matrix:
             for i, word in enumerate(self.data[row_idx]):
                 result |= int(word) << (i * 64)
             return result
+
+    def __eq__(self, other: object) -> bool:
+        """Structural equality, matching :meth:`SparseGF2Matrix.__eq__`."""
+        if not isinstance(other, SparseGF2Matrix | DenseGF2Matrix):
+            return NotImplemented
+        if (self.rows, self.cols) != (other.rows, other.cols):
+            return False
+        return [self.get_row_bitwise(i) for i in range(self.rows)] == [
+            other.get_row_bitwise(i) for i in range(other.rows)
+        ]
+
+    def __repr__(self):
+        stats = self.memory_usage()
+        return f"DenseGF2Matrix({self.rows}x{self.cols}, nnz={stats.nnz}, memory={stats.memory_bytes}B)"
 
     def memory_usage(self) -> SparseStats:
         """Calculate memory usage and basic stats for dense matrix."""

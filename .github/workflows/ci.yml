@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,13 +17,71 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -e .[dev,test]
-      - name: Lint and Format Check
+          pip install -e ".[dev]"
+      - name: Lint and format check
         run: |
           ruff check .
           ruff format --check .
       - name: Type check
         run: mypy gf2
+
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every version the package claims to support in its classifiers must
+        # actually be exercised; testing only 3.11 while advertising 3.10-3.13
+        # is a promise nothing checks.
+        os: [ubuntu-latest]
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+        include:
+          - os: macos-latest
+            python-version: '3.12'
+          - os: windows-latest
+            python-version: '3.12'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
       - name: Test
         run: pytest -q
 
+  oldest-deps:
+    # The declared floor (numpy>=1.23) has to hold, not just the latest release.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install with the oldest supported NumPy
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+          pip install "numpy==1.23.5"
+      - name: Test
+        run: pytest -q
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build and check distributions
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          twine check --strict dist/*
+      - name: Install the wheel in a clean environment and import it
+        run: |
+          python -m venv /tmp/fresh
+          /tmp/fresh/bin/pip install dist/*.whl
+          cd /tmp && /tmp/fresh/bin/python -c "import gf2; print(gf2.__version__); print(gf2.rank(gf2.identity(8)))"
