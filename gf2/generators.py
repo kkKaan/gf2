@@ -7,9 +7,9 @@ quantum error correction, and cryptographic applications.
 
 Generators:
 - LDPC codes: Random, regular, structured
-- Quantum codes: Surface codes, color codes, CSS codes
-- Classical codes: Hamming, BCH, Reed-Solomon
-- Structured: Circulant, Toeplitz, Vandermonde
+- Quantum codes: surface codes, CSS codes, hypergraph products, bicycle codes
+- Classical codes: Hamming, repetition
+- Structured: circulant, Toeplitz
 - Random: Various sparsity patterns
 """
 
@@ -190,41 +190,6 @@ def toeplitz(first_row: list[int], first_col: list[int]) -> SparseGF2Matrix:
     return create_sparse_matrix(rows, cols, coordinates=coordinates)
 
 
-def vandermonde(elements: list[int], n: int) -> SparseGF2Matrix:
-    """
-    Create Vandermonde matrix over GF(2).
-
-    Args:
-        elements: List of elements (represented as integers)
-        n: Number of powers (columns)
-
-    Returns:
-        Matrix where A[i,j] = elements[i]**j mod 2
-
-    Warning:
-        This reduces integer powers mod 2, which is *not* a Vandermonde matrix
-        over an extension field GF(2^m). Because parity of a power depends only
-        on the parity of the base, every row here is either all ones (odd
-        element) or [1, 0, 0, ...] (even element), so the matrix has rank at
-        most 2. A Vandermonde over GF(2^m) needs extension-field arithmetic,
-        which this library does not implement.
-    """
-    m = len(elements)
-    coordinates = []
-
-    for i in range(m):
-        elem = elements[i]
-        power = 1  # elem^0 = 1
-
-        for j in range(n):
-            if power & 1:  # Check if power is odd (= 1 in GF(2))
-                coordinates.append((i, j))
-
-            power = (power * elem) & ((1 << 32) - 1)  # Prevent overflow
-
-    return create_sparse_matrix(m, n, coordinates=coordinates)
-
-
 def hamming_matrix(r: int) -> SparseGF2Matrix:
     """
     Create parity check matrix for Hamming code.
@@ -243,37 +208,6 @@ def hamming_matrix(r: int) -> SparseGF2Matrix:
         for col in range(1, n + 1)
         for row in range(r)
         if (col >> row) & 1  # Check if bit 'row' is set in 'col'
-    ]
-
-    return create_sparse_matrix(r, n, coordinates=coordinates)
-
-
-def bch_matrix(n: int, k: int, t: int) -> SparseGF2Matrix:
-    """
-    Create BCH code parity check matrix (simplified).
-
-    Args:
-        n: Code length
-        k: Information length
-        t: Error correction capability
-
-    Returns:
-        An (n-k) x n binary matrix.
-
-    Warning:
-        This is NOT a BCH parity check matrix. A genuine BCH code needs powers
-        of a primitive element of GF(2^m); the pattern below is a fixed
-        arithmetic mask with no coding-theoretic meaning, and ``t`` is ignored
-        entirely. Do not use it to build or analyse a BCH code.
-    """
-
-    r = n - k  # Number of parity checks
-
-    coordinates = [
-        (i, j)
-        for i in range(r)
-        for j in range(n)
-        if ((i + 1) * (j + 1)) % 3 == 1  # primitive polynomial approach simplified condition
     ]
 
     return create_sparse_matrix(r, n, coordinates=coordinates)
@@ -459,54 +393,6 @@ def surface_code_matrix(distance: int, boundary: str = "open") -> tuple[SparseGF
 
     H = repetition_matrix(distance)
     return hypergraph_product(H, H)
-
-
-def color_code_matrix(distance: int) -> tuple[SparseGF2Matrix, SparseGF2Matrix]:
-    """
-    Generate color code parity check matrices (simplified triangular lattice).
-
-    Args:
-        distance: Code distance
-
-    Returns:
-        (H_x, H_z) - X and Z parity check matrices
-
-    Warning:
-        This does NOT produce a valid color code. The stabilisers below are a
-        fixed triangular pattern that does not satisfy the CSS commutation
-        condition ``H_x @ H_z.T == 0``, so the pair is not a quantum code and
-        must not be fed to a decoder. Use :func:`surface_code_matrix` or
-        :func:`hypergraph_product`, which are exact. Kept only so existing
-        callers keep importing; a real color code needs a proper 2-colex
-        lattice.
-    """
-    # Simplified color code on triangular lattice
-    # This is a basic implementation - full color codes are more complex
-
-    n_data = distance * distance
-    n_stabilizers = n_data // 2
-
-    # Generate coordinates for X and Z stabilizers
-    x_coordinates = []
-    z_coordinates = []
-
-    stab_idx = 0
-    for i in range(0, n_data - distance, distance):
-        for j in range(0, distance - 2, 2):
-            # X stabilizer on 3 qubits (triangle)
-            qubits_x = [i + j, i + j + 1, i + j + distance]
-            x_coordinates.extend([(stab_idx, qubit) for qubit in qubits_x if qubit < n_data])
-
-            # Z stabilizer on adjacent triangle
-            qubits_z = [i + j + 1, i + j + 2, i + j + distance + 1]
-            z_coordinates.extend([(stab_idx, qubit) for qubit in qubits_z if qubit < n_data])
-
-            stab_idx += 1
-
-    H_x = create_sparse_matrix(n_stabilizers, n_data, coordinates=x_coordinates)
-    H_z = create_sparse_matrix(n_stabilizers, n_data, coordinates=z_coordinates)
-
-    return H_x, H_z
 
 
 def css_code_matrix(H1: SparseGF2Matrix, H2: SparseGF2Matrix) -> tuple[SparseGF2Matrix, SparseGF2Matrix]:

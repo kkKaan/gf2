@@ -2,7 +2,7 @@
 
 High-performance binary (GF(2)) matrix operations library for Python.
 
-[![CI](https://github.com/kkkaan/gf2/workflows/CI/badge.svg)](https://github.com/kkkaan/gf2/actions)
+[![CI](https://github.com/kkKaan/gf2/workflows/CI/badge.svg)](https://github.com/kkKaan/gf2/actions)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -15,7 +15,7 @@ High-performance binary (GF(2)) matrix operations library for Python.
 
 ```bash
 # Install from source (development)
-git clone https://github.com/kkkaan/gf2.git
+git clone https://github.com/kkKaan/gf2.git
 cd gf2
 pip install -e ".[dev,test]"
 ```
@@ -47,7 +47,7 @@ null_space = gf2.nullspace(A)  # Null space basis
 
 # Matrix generators for coding theory
 H = gf2.hamming_matrix(3)  # Hamming code parity check
-ldpc = gf2.ldpc_matrix(100, 200, row_weight=3)  # LDPC code
+ldpc = gf2.ldpc_matrix(100, 200, row_weight=4)  # LDPC code (m*row_weight must divide n)
 circ = gf2.circulant([1, 0, 1, 1])  # Circulant matrix
 ```
 
@@ -76,11 +76,15 @@ H = gf2.ldpc_matrix(m=500, n=1000, row_weight=6, method="progressive")
 
 # Classical codes
 hamming_H = gf2.hamming_matrix(r=4)  # [15,11,3] Hamming code
-bch_H = gf2.bch_matrix(n=15, k=7, t=2)  # BCH code (simplified)
+rep_H = gf2.repetition_matrix(5)  # length-5 repetition code
+
+# Quantum codes (exact CSS commutation: H_x @ H_z.T == 0)
+H_x, H_z = gf2.surface_code_matrix(distance=3)  # planar surface code, k=1
+Q_x, Q_z = gf2.hypergraph_product(hamming_H, rep_H)  # Tillich-Zemor product
 
 # Structured matrices
 toeplitz_A = gf2.toeplitz([1, 0, 1], [1, 1, 0, 1])
-vandermonde_V = gf2.vandermonde([1, 2, 3, 4], n=6)
+circ = gf2.circulant([1, 0, 1, 1])
 ```
 
 ## Performance
@@ -100,7 +104,7 @@ Python step per column.
 ### Measured results
 
 Numbers, methodology, and the exact environment live in
-[`benchmarks/BENCHMARK_RESULTS.md`](benchmarks/BENCHMARK_RESULTS.md), which is
+[`benchmarks/BENCHMARK_RESULTS.md`](https://github.com/kkKaan/gf2/blob/main/benchmarks/BENCHMARK_RESULTS.md), which is
 **generated from `benchmarks/results.json`** rather than written by hand.
 
 To reproduce:
@@ -140,7 +144,7 @@ strawman: the baseline that matters is bit-packed uint64 NumPy, which is the
 
 ```bash
 # Clone and setup
-git clone https://github.com/kkkaan/gf2.git
+git clone https://github.com/kkKaan/gf2.git
 cd gf2
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
@@ -160,7 +164,7 @@ pre-commit install
 
 ## Simon's Algorithm Postprocessing
 
-Binpy provides fast GF(2) nullspace routines used in Simon-style workflows. Two options:
+gf2 provides fast GF(2) nullspace routines used in Simon-style workflows:
 
 - High-level basis: `gf2.nullspace(A)` returns a basis as a list of 0/1 lists
 - Fast bitwise single solution: `gf2.nullspace_bitwise(A)` -> `(solution_bits: str, seconds: float)`

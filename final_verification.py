@@ -26,7 +26,7 @@ def run_command(cmd, description):
 def main():
     """Run all verification checks."""
     print("\n" + "=" * 80)
-    print("FINAL VERIFICATION - BINPY PRODUCTION READINESS")
+    print("FINAL VERIFICATION - gf2 PRODUCTION READINESS")
     print("=" * 80)
 
     all_passed = True

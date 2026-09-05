@@ -16,11 +16,9 @@ from hypothesis import given, strategies as st
 
 from gf2.core import add, multiply, rank, transpose
 from gf2.generators import (
-    bch_matrix,
     bicycle_codes,
     circulant,
     circulant_random,
-    color_code_matrix,
     css_code_matrix,
     hamming_matrix,
     hypergraph_product,
@@ -31,7 +29,6 @@ from gf2.generators import (
     random_sparse,
     surface_code_matrix,
     toeplitz,
-    vandermonde,
     zeros,
 )
 from gf2.sparse import SparseGF2Matrix
@@ -348,33 +345,6 @@ class TestClassicalCodeGenerators:
             assert syndrome_value == expected_syndrome, f"Syndrome mismatch for error at position {error_pos}"
 
     @pytest.mark.unit
-    def test_bch_matrix_basic(self):
-        """Test basic BCH code matrix generation."""
-        n, k, t = 15, 11, 1  # BCH(15,11,1) - single error correcting
-
-        H = bch_matrix(n, k, t)
-
-        assert H.rows == n - k  # Number of parity checks
-        assert H.cols == n  # Code length
-
-        # Should be a valid matrix
-        assert isinstance(H, SparseGF2Matrix)
-
-    @pytest.mark.unit
-    def test_bch_matrix_rank(self):
-        """Test that BCH matrices have appropriate rank."""
-        n, k, t = 7, 4, 1
-
-        H = bch_matrix(n, k, t)
-
-        # BCH matrix should have full row rank
-        matrix_rank = rank(H)
-        _expected_rank = min(H.rows, H.cols)
-
-        # For small BCH codes, we expect reasonable rank
-        assert matrix_rank >= H.rows // 2, f"BCH matrix rank {matrix_rank} seems too low"
-
-    @pytest.mark.unit
     @pytest.mark.parametrize("r", [2, 3, 4])
     def test_hamming_different_sizes(self, r):
         """Test Hamming matrices of different sizes."""
@@ -593,113 +563,6 @@ class TestStructuredMatrixGenerators:
         T_zero = toeplitz(first_row_zero, first_col_zero)
         assert rank(T_zero) == 0
 
-    @pytest.mark.unit
-    def test_vandermonde_matrix_structure(self):
-        """Test Vandermonde matrix structure over GF(2)."""
-        elements = [1, 2, 3, 5]
-        n = 4
-
-        V = vandermonde(elements, n)
-
-        assert V.rows == len(elements)
-        assert V.cols == n
-
-        # Verify Vandermonde property: V[i,j] = elements[i]^j (mod 2)
-        for i in range(len(elements)):
-            elem = elements[i]
-            power = 1  # elem^0 = 1
-
-            for j in range(n):
-                expected = power & 1  # Take mod 2
-                actual = V.get(i, j)
-                assert actual == expected, f"Vandermonde property violated at ({i},{j})"
-
-                power = (power * elem) & ((1 << 32) - 1)  # Prevent overflow
-
-    @pytest.mark.unit
-    def test_vandermonde_algebraic_properties(self):
-        """Test algebraic properties of Vandermonde matrices."""
-        # Test Vandermonde determinant properties (in GF(2))
-        elements = [1, 2, 3]  # Distinct elements
-        n = 3
-
-        V = vandermonde(elements, n)
-
-        # Vandermonde matrix should have good rank properties when elements are distinct
-        matrix_rank = rank(V)
-        assert matrix_rank >= 1  # Should not be zero matrix
-
-        # Test with repeated elements (should reduce rank)
-        elements_repeated = [2, 2, 3]
-        V_repeated = vandermonde(elements_repeated, n)
-        rank_repeated = rank(V_repeated)
-
-        # With repeated elements, rank should be affected
-        assert rank_repeated <= matrix_rank
-
-    @pytest.mark.unit
-    def test_vandermonde_polynomial_properties(self):
-        """Test polynomial evaluation properties of Vandermonde matrices."""
-        # Vandermonde matrices are related to polynomial evaluation
-        elements = [1, 2, 4, 7]
-        n = 4
-
-        V = vandermonde(elements, n)
-
-        # Each row represents powers of an element
-        for i in range(len(elements)):
-            elem = elements[i]
-
-            # Check that row i contains [1, elem, elem^2, elem^3, ...] mod 2
-            power = 1
-            for j in range(n):
-                expected = power & 1
-                actual = V.get(i, j)
-                assert actual == expected, f"Power property violated at ({i},{j})"
-                power = (power * elem) & ((1 << 32) - 1)
-
-    @pytest.mark.unit
-    def test_vandermonde_transpose_properties(self):
-        """Test transpose properties of Vandermonde matrices."""
-        elements = [1, 3, 5, 7]
-        n = 4
-
-        V = vandermonde(elements, n)
-        V_T = transpose(V)
-
-        # Transpose should have specific structure
-        # V^T[j,i] = elements[i]^j (mod 2)
-        for j in range(n):
-            for i in range(len(elements)):
-                elem = elements[i]
-                power = 1
-                for _ in range(j):
-                    power = (power * elem) & ((1 << 32) - 1)
-
-                expected = power & 1
-                actual = V_T.get(j, i)
-                assert actual == expected, f"Transpose property violated at ({j},{i})"
-
-    @pytest.mark.unit
-    def test_vandermonde_special_cases(self):
-        """Test special cases of Vandermonde matrices."""
-        # Test with element 0 (should give [1, 0, 0, ...])
-        elements = [0, 1, 2]
-        n = 4
-
-        V = vandermonde(elements, n)
-
-        # First row (element 0): [1, 0, 0, 0]
-        assert V.get(0, 0) == 1
-        for j in range(1, n):
-            assert V.get(0, j) == 0
-
-        # Test with element 1 (should give [1, 1, 1, ...])
-        assert V.get(1, 0) == 1
-        assert V.get(1, 1) == 1
-        assert V.get(1, 2) == 1
-        assert V.get(1, 3) == 1
-
     @pytest.mark.property
     @given(st.lists(st.integers(min_value=0, max_value=1), min_size=3, max_size=8))
     def test_circulant_property_based(self, first_row):
@@ -746,30 +609,6 @@ class TestStructuredMatrixGenerators:
                         assert T.get(i, j) == T.get(i2, j2), (
                             f"Toeplitz property violated: ({i},{j}) != ({i2},{j2})"
                         )
-
-    @pytest.mark.property
-    @given(
-        st.lists(st.integers(min_value=1, max_value=15), min_size=2, max_size=5),
-        st.integers(min_value=2, max_value=6),
-    )
-    def test_vandermonde_property_based(self, elements, n):
-        """Property-based test for Vandermonde matrices."""
-        V = vandermonde(elements, n)
-
-        # Basic properties
-        assert V.rows == len(elements)
-        assert V.cols == n
-
-        # Vandermonde property: V[i,j] = elements[i]^j (mod 2)
-        for i in range(len(elements)):
-            elem = elements[i]
-            power = 1
-
-            for j in range(n):
-                expected = power & 1
-                actual = V.get(i, j)
-                assert actual == expected, f"Vandermonde property violated at ({i},{j})"
-                power = (power * elem) & ((1 << 32) - 1)
 
 
 class TestQuantumCodeGenerators:
@@ -852,75 +691,6 @@ class TestQuantumCodeGenerators:
             surface_code_matrix(1)
         with pytest.raises(NotImplementedError):
             surface_code_matrix(3, boundary="periodic")
-
-    @pytest.mark.unit
-    def test_color_code_basic(self):
-        """Test basic color code generation."""
-        distance = 3
-        H_x, H_z = color_code_matrix(distance)
-
-        # Basic dimension checks
-        n_data = distance * distance
-        assert H_x.cols == n_data
-        assert H_z.cols == n_data
-
-        # Should be valid matrices
-        assert isinstance(H_x, SparseGF2Matrix)
-        assert isinstance(H_z, SparseGF2Matrix)
-
-    @pytest.mark.unit
-    def test_color_code_stabilizer_properties(self):
-        """Test color code stabilizer properties."""
-        distance = 3
-        H_x, H_z = color_code_matrix(distance)
-
-        n_data = distance * distance
-        n_stabilizers = n_data // 2
-
-        assert H_x.rows == n_stabilizers
-        assert H_z.rows == n_stabilizers
-
-        # Test that stabilizers have reasonable weights (allowing for simplified implementation)
-        total_x_weight = 0
-        non_zero_x_stabs = 0
-        for i in range(H_x.rows):
-            row_weight = sum(H_x.get(i, j) for j in range(H_x.cols))
-            if row_weight > 0:
-                non_zero_x_stabs += 1
-                total_x_weight += row_weight
-                assert row_weight <= 3, f"X stabilizer {i} has weight {row_weight}, expected ≤ 3"
-
-        total_z_weight = 0
-        non_zero_z_stabs = 0
-        for i in range(H_z.rows):
-            row_weight = sum(H_z.get(i, j) for j in range(H_z.cols))
-            if row_weight > 0:
-                non_zero_z_stabs += 1
-                total_z_weight += row_weight
-                assert row_weight <= 3, f"Z stabilizer {i} has weight {row_weight}, expected ≤ 3"
-
-        # Should have at least some non-zero stabilizers
-        assert non_zero_x_stabs > 0 or non_zero_z_stabs > 0, "Should have at least one non-zero stabilizer"
-
-    @pytest.mark.unit
-    def test_color_code_commutation_relations(self):
-        """Test color code commutation relations."""
-        distance = 3
-        H_x, H_z = color_code_matrix(distance)
-
-        # Test commutation: H_x * H_z^T = 0 (allowing for simplified implementation)
-        H_z_T = transpose(H_z)
-        product = multiply(H_x, H_z_T)
-
-        # Count commutation errors
-        non_zero_count = sum(
-            1 for i in range(product.rows) for j in range(product.cols) if product.get(i, j) != 0
-        )
-        total_entries = product.rows * product.cols
-        error_rate = non_zero_count / total_entries if total_entries > 0 else 0
-
-        # Allow reasonable error rate for simplified color code implementation
-        assert error_rate <= 0.7, f"Too many commutation errors: {error_rate:.2%}"
 
     @pytest.mark.unit
     def test_css_code_construction(self):
@@ -1225,31 +995,6 @@ class TestQuantumCodeGenerators:
         # CSS commutation must hold exactly - no tolerance.
         product = multiply(H_x, transpose(H_z))
         assert not any(product.get_all_rows_bitwise()), f"Distance {distance}: H_x @ H_z^T != 0"
-
-    @pytest.mark.property
-    @given(st.integers(min_value=2, max_value=5))
-    def test_color_code_property_based(self, distance):
-        """Property-based test for color codes."""
-        H_x, H_z = color_code_matrix(distance)
-
-        # Basic properties
-        n_data = distance * distance
-        assert H_x.cols == n_data
-        assert H_z.cols == n_data
-
-        # Commutation relations (allowing for simplified implementation)
-        H_z_T = transpose(H_z)
-        product = multiply(H_x, H_z_T)
-
-        # Count commutation errors
-        non_zero_count = sum(
-            1 for i in range(product.rows) for j in range(product.cols) if product.get(i, j) != 0
-        )
-        total_entries = product.rows * product.cols
-        error_rate = non_zero_count / total_entries if total_entries > 0 else 0
-
-        # Allow reasonable error rate for simplified implementation
-        assert error_rate <= 0.8, f"Distance {distance}: too many commutation errors: {error_rate:.2%}"
 
 
 class TestGeneratorEdgeCases:
