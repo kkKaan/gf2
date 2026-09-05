@@ -33,6 +33,18 @@ First public release.
   `surface_code_matrix` (planar, built as a hypergraph product of repetition
   codes), `css_code_matrix`, `bicycle_codes`.
 - `py.typed`: the package is annotated throughout and ships its types.
+- Structural equality on both matrix types: `A == B` compares shape and
+  contents, independently of storage format, and a sparse matrix compares equal
+  to a dense one holding the same bits. Previously `==` fell through to
+  identity and returned False for equal matrices. Defining `__eq__` makes the
+  types unhashable, which is correct: they are mutable through `set_bit`.
+- Operations returning several values return NamedTuples -- `LUDecomposition`,
+  `RowEchelonForm`, `NullspaceVector`, `RankNullity` -- so a caller can write
+  `result.pivot_columns` instead of `result[1]`. They unpack positionally
+  exactly like the plain tuples they replace.
+- `lu_decomposition` returns `(L, U, perm)` with `A[perm] == L @ U`, plus
+  `LUDecomposition.permutation_matrix()` for the equivalent `P @ A == L @ U`
+  form.
 - A benchmark suite (`benchmarks/`) with a documented measurement methodology,
   and a report generated from recorded measurements rather than written by hand.
 
@@ -71,6 +83,19 @@ Defects found during pre-release review, all of which failed silently:
   dimensions; packed rows are masked to the column count.
 - `random_regular` could emit under-weight rows; seeded generators no longer
   reseed the global `random` module.
+- `lu_decomposition` swapped rows of U without recording the permutation or
+  applying it to L, so its output satisfied neither `A == L @ U` nor
+  `P @ A == L @ U`. It reconstructed A in roughly half of random cases and gave
+  the caller no way to recover the difference. It now returns the permutation
+  as a third element and reconstructs exactly, verified over 500 random
+  matrices. The existing test was named `..._reconstruction` but only asserted
+  the triangular shapes, which is how this survived.
+- The packed representation assumed the host was little-endian: it paired
+  `int.to_bytes(..., "little")` with native-order NumPy arrays. On a big-endian
+  host (NumPy ships s390x wheels) a single set bit in word 0 read back as
+  2**56, and `unpackbits` returned the wrong byte's bits - wrong answers rather
+  than an error. The storage dtype is now pinned to `"<u8"`, which is the
+  native dtype on little-endian hosts and therefore costs nothing there.
 
 ### Removed
 

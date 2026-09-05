@@ -327,7 +327,13 @@ def test_lu_decomposition_reconstruction(n):
         A = random_sparse(n, n, 0.6, seed=seed)
 
         try:
-            L, U = lu_decomposition(A)
+            L, U, perm = lu_decomposition(A)
+
+            # The name of this test promised reconstruction but only the
+            # triangular shapes were ever asserted, so a decomposition that
+            # could not rebuild A passed for as long as it existed.
+            permuted = [A.to_dense()[i] for i in perm]
+            assert multiply(L, U).to_dense() == permuted, "A[perm] must equal L @ U"
 
             # Verify dimensions are correct
             assert L.rows == n and L.cols == n, "L matrix has incorrect dimensions"
@@ -350,7 +356,7 @@ def test_lu_decomposition_reconstruction(n):
                 for j in range(i):
                     assert (U_row >> j) & 1 == 0, f"U matrix element U[{i},{j}] should be 0"
 
-            # Test that L * U has same rank as A (may not be exactly equal due to row swaps)
+            # Row permutation preserves rank, so L @ U must match A's.
             LU = multiply(L, U)
             rank_A = rank(A)
             rank_LU = rank(LU)

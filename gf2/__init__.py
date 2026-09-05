@@ -74,6 +74,11 @@ __all__ = [
     # Factory and storage statistics
     "create_sparse_matrix",
     "SparseStats",
+    # Structured results returned by the operations above
+    "LUDecomposition",
+    "RowEchelonForm",
+    "NullspaceVector",
+    "RankNullity",
 ]
 
 try:  # keep one source of truth: the version declared in pyproject.toml

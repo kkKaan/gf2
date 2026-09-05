@@ -14,9 +14,11 @@ Operations:
 - Specialized: nullspace, kernel, image
 """
 
+from typing import NamedTuple
+
 import numpy as np
 
-from .sparse import DenseGF2Matrix, SparseGF2Matrix, _int_from_words, _set_bit_positions
+from .sparse import _U64, DenseGF2Matrix, SparseGF2Matrix, _int_from_words, _set_bit_positions
 
 # Block width for the Method of Four Russians. 8 keeps the 2**k lookup table
 # at 256 rows, which stays in L1 for every matrix width we care about, and
@@ -58,10 +60,10 @@ def _packed_u64(A: SparseGF2Matrix | DenseGF2Matrix) -> np.ndarray:
     if accessor is not None:
         return accessor()
     words = max((A.cols + 63) // 64, 1)
-    out = np.zeros((A.rows, words), dtype=np.uint64)
+    out = np.zeros((A.rows, words), dtype=_U64)
     nbytes = words * 8
     for i, value in enumerate(_rows_of(A)):
-        out[i] = np.frombuffer(int(value).to_bytes(nbytes, "little"), dtype=np.uint64)
+        out[i] = np.frombuffer(int(value).to_bytes(nbytes, "little"), dtype=_U64)
     return out
 
 
@@ -85,9 +87,9 @@ def _m4rm(A_bits: np.ndarray, B_packed: np.ndarray, k: int = _M4RM_BLOCK) -> np.
     weights = 1 << np.arange(k, dtype=np.uint16)
     codes = (padded.reshape(m, n_blocks, k).astype(np.uint16) * weights).sum(axis=2).astype(np.uint8)
 
-    out = np.zeros((m, w), dtype=np.uint64)
-    block_rows = np.zeros((k, w), dtype=np.uint64)
-    table = np.zeros((1 << k, w), dtype=np.uint64)
+    out = np.zeros((m, w), dtype=_U64)
+    block_rows = np.zeros((k, w), dtype=_U64)
+    table = np.zeros((1 << k, w), dtype=_U64)
 
     for block in range(n_blocks):
         base = block * k
@@ -229,7 +231,7 @@ def _rank_packed(packed: np.ndarray, n_cols: int) -> int:
     of rows. That is what makes it overtake the big-integer loop past
     ``_PACKED_ELIM_MIN_DIM``.
     """
-    A = packed.copy()  # elimination is destructive
+    A = packed.astype(_U64, copy=True)  # destructive, and must be little-endian
     n_rows = A.shape[0]
     rank_count = 0
     for col in range(n_cols):
@@ -259,9 +261,9 @@ def _pack_rows_u64(rows: list[int], n_cols: int) -> np.ndarray:
     """Big-integer rows -> a (rows, words) uint64 array."""
     words = max((n_cols + 63) // 64, 1)
     nbytes = words * 8
-    out = np.empty((len(rows), words), dtype=np.uint64)
+    out = np.empty((len(rows), words), dtype=_U64)
     for i, value in enumerate(rows):
-        out[i] = np.frombuffer(int(value).to_bytes(nbytes, "little"), dtype=np.uint64)
+        out[i] = np.frombuffer(int(value).to_bytes(nbytes, "little"), dtype=_U64)
     return out
 
 
@@ -410,12 +412,29 @@ def gaussian_elimination_inplace(
     return rows[:rank_count], pivot_cols
 
 
-def reduced_row_echelon_form(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[SparseGF2Matrix, list[int]]:
+class RowEchelonForm(NamedTuple):
+    """Result of :func:`reduced_row_echelon_form`.
+
+    Unpacks as ``(matrix, pivot_columns)``.
+
+    Attributes:
+        matrix: The reduced rows, one per pivot; zero rows are dropped, so this
+            has ``rank(A)`` rows rather than ``A.rows``.
+        pivot_columns: Column index of each pivot, ascending and aligned with
+            the rows of ``matrix``.
+    """
+
+    matrix: SparseGF2Matrix
+    pivot_columns: list[int]
+
+
+def reduced_row_echelon_form(A: SparseGF2Matrix | DenseGF2Matrix) -> RowEchelonForm:
     """
     Compute reduced row echelon form (RREF) of matrix.
 
     Returns:
-        (rref_matrix, pivot_columns)
+        A :class:`RowEchelonForm` of ``(matrix, pivot_columns)``. Only the
+        ``rank(A)`` non-zero rows are returned.
     """
     # Copy: gaussian_elimination_inplace mutates the list it is handed.
     rows = _rows_of(A)[:]
@@ -427,61 +446,114 @@ def reduced_row_echelon_form(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[Spars
     result = SparseGF2Matrix(len(rref_rows), A.cols)
     result.set_from_packed_rows(rref_rows)
 
-    return result, pivot_cols
+    return RowEchelonForm(result, pivot_cols)
 
 
-def lu_decomposition(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[SparseGF2Matrix, SparseGF2Matrix]:
+class LUDecomposition(NamedTuple):
+    """Result of :func:`lu_decomposition`, satisfying ``A[perm] == L @ U``.
+
+    Unpacks as a plain ``(L, U, perm)`` tuple; the field names exist so that a
+    reader does not have to remember what the third element is.
+
+    Attributes:
+        L: Unit lower triangular factor.
+        U: Upper triangular factor.
+        perm: Row indices of the original matrix, in the order the elimination
+            consumed them. ``perm[i]`` is the row of A that became row i, so
+            ``[A_rows[i] for i in perm] == (L @ U)_rows``.
     """
-    LU decomposition over GF(2) using Gaussian elimination.
 
-    Returns PLU decomposition where P is implicit (no pivoting for simplicity).
-    For GF(2), we perform elimination without pivoting when possible.
+    L: SparseGF2Matrix
+    U: SparseGF2Matrix
+    perm: list[int]
+
+    def permutation_matrix(self) -> SparseGF2Matrix:
+        """The permutation P as a matrix, so that ``P @ A == L @ U``.
+
+        Provided because the index list is the cheaper representation to
+        compute and store, while the matrix form is the one that composes with
+        the rest of this library's operations.
+        """
+        n = len(self.perm)
+        P = SparseGF2Matrix(n, n)
+        P.set_from_packed_rows([1 << source for source in self.perm])
+        return P
+
+
+def lu_decomposition(A: SparseGF2Matrix | DenseGF2Matrix) -> LUDecomposition:
+    """
+    PLU decomposition over GF(2): ``A[perm] == L @ U``.
+
+    Args:
+        A: Square matrix.
 
     Returns:
-        (L, U) where L * U approximates A (may need permutation for exact equality)
+        An :class:`LUDecomposition` of ``(L, U, perm)``. L is unit lower
+        triangular, U is upper triangular, and permuting A's rows by ``perm``
+        reproduces ``L @ U`` exactly. Use
+        :meth:`LUDecomposition.permutation_matrix` for the equivalent
+        ``P @ A == L @ U`` form.
+
+    Example:
+        >>> from gf2 import identity, lu_decomposition, multiply
+        >>> result = lu_decomposition(identity(3))
+        >>> result.perm
+        [0, 1, 2]
+        >>> multiply(result.L, result.U).to_dense() == identity(3).to_dense()
+        True
+
+    Note:
+        Rank-deficient input is accepted: columns with no available pivot are
+        skipped, and the identity above still holds.
+
+        Earlier development builds returned only ``(L, U)`` and swapped rows of
+        U without recording the permutation or applying it to L. The result
+        satisfied neither ``A == L @ U`` nor ``P @ A == L @ U``: it
+        reconstructed A in roughly half of random cases, with no way for a
+        caller to recover the difference.
     """
     if A.rows != A.cols:
         raise ValueError("Matrix must be square for LU decomposition")
 
     n = A.rows
-
-    # Initialize L as identity, U as copy of A
-    L_rows = [(1 << i) for i in range(n)]  # Identity matrix
+    perm = list(range(n))
     U_rows = _rows_of(A)[:]
+    # Strictly lower multipliers; the unit diagonal is added at the end so that
+    # a row swap moves only the multipliers already computed for that row.
+    L_rows = [0] * n
 
-    # Gaussian elimination without pivoting (for GF(2) simplicity)
     for k in range(n):
-        # Check if pivot exists
-        if not ((U_rows[k] >> k) & 1):
-            # Try to find a row below with non-zero element in column k
-            pivot_found = False
-            for i in range(k + 1, n):
-                if (U_rows[i] >> k) & 1:
-                    # Swap rows in U only
-                    U_rows[k], U_rows[i] = U_rows[i], U_rows[k]
-                    pivot_found = True
-                    break
+        bit = 1 << k
 
-            if not pivot_found:
-                # Column k is all zeros below diagonal, continue
+        if not (U_rows[k] & bit):
+            pivot = None
+            for i in range(k + 1, n):
+                if U_rows[i] & bit:
+                    pivot = i
+                    break
+            if pivot is None:
+                # Column k has no pivot at or below the diagonal.
                 continue
 
-        # Eliminate below diagonal
-        for i in range(k + 1, n):
-            if (U_rows[i] >> k) & 1:
-                # Record the elimination in L
-                L_rows[i] |= 1 << k  # Set L[i,k] = 1
-                # Eliminate in U
-                U_rows[i] ^= U_rows[k]
+            # Swap U, the recorded multipliers, and the permutation together;
+            # swapping U alone is what broke the factorisation before.
+            U_rows[k], U_rows[pivot] = U_rows[pivot], U_rows[k]
+            L_rows[k], L_rows[pivot] = L_rows[pivot], L_rows[k]
+            perm[k], perm[pivot] = perm[pivot], perm[k]
 
-    # Create result matrices
+        pivot_row = U_rows[k]
+        for i in range(k + 1, n):
+            if U_rows[i] & bit:
+                L_rows[i] |= bit
+                U_rows[i] ^= pivot_row
+
     L = SparseGF2Matrix(n, n)
-    L.set_from_packed_rows(L_rows)
+    L.set_from_packed_rows([L_rows[i] | (1 << i) for i in range(n)])
 
     U = SparseGF2Matrix(n, n)
     U.set_from_packed_rows(U_rows)
 
-    return L, U
+    return LUDecomposition(L, U, perm)
 
 
 def matrix_power(A: SparseGF2Matrix | DenseGF2Matrix, k: int) -> SparseGF2Matrix | DenseGF2Matrix:
