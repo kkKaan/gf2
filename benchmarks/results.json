@@ -1,0 +1,1763 @@
+{
+  "environment": {
+    "python": "3.11.0",
+    "numpy": "2.2.6",
+    "galois": "0.4.6",
+    "platform": "macOS-15.7.7-arm64-arm-64bit",
+    "machine": "arm64",
+    "processor": "arm",
+    "gf2": "0.1.0"
+  },
+  "operations": [
+    {
+      "operation": "rank  (64x64)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 0.1016668975353241,
+            "median_ms": 0.10495772585272789,
+            "p90_ms": 0.10712491348385811,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.1032920554280281,
+            "median_ms": 0.10424992069602013,
+            "p90_ms": 0.10799989104270935,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.00278472900390625,
+            "resident_mib": 0.00048828125
+          },
+          "note": "big-int elim; vectorised past n=384"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 0.07862504571676254,
+            "median_ms": 0.08262507617473602,
+            "p90_ms": 0.08645839989185333,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.3127921372652054,
+            "median_ms": 0.3172503784298897,
+            "p90_ms": 0.3249999135732651,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.0045013427734375,
+            "resident_mib": 0.00048828125
+          },
+          "note": "uint64 rows, vectorised XOR"
+        },
+        "numpy-naive": {
+          "setup": {
+            "min_ms": 0.07754098623991013,
+            "median_ms": 0.07795915007591248,
+            "p90_ms": 0.08108280599117279,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.6925412453711033,
+            "median_ms": 0.7427912205457687,
+            "p90_ms": 0.7463330402970314,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.03905487060546875,
+            "resident_mib": 0.00390625
+          },
+          "note": "element-wise (strawman)"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 0.10558310896158218,
+            "median_ms": 0.10841619223356247,
+            "p90_ms": 0.1461673527956009,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 2.3843329399824142,
+            "median_ms": 2.5992919690907,
+            "p90_ms": 2.775208093225956,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.019957542419433594,
+            "resident_mib": 0.00390625
+          },
+          "note": "galois.GF(2)"
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy-packed": "match",
+        "numpy-naive": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 64,
+      "density": 0.5
+    },
+    {
+      "operation": "nullspace vector  (63x64)",
+      "results": {
+        "gf2 nullspace_fast": {
+          "setup": {
+            "min_ms": 8.381903171539307e-05,
+            "median_ms": 8.381903171539307e-05,
+            "p90_ms": 8.42846930027008e-05,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.2738330513238907,
+            "median_ms": 0.2792500890791416,
+            "p90_ms": 0.28791697695851326,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.010528564453125,
+            "resident_mib": null
+          },
+          "note": "one vector"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 0.08204113692045212,
+            "median_ms": 0.08383393287658691,
+            "p90_ms": 0.08695805445313454,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.6113750860095024,
+            "median_ms": 0.6416668184101582,
+            "p90_ms": 0.651208683848381,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.0062122344970703125,
+            "resident_mib": 0.00048065185546875
+          },
+          "note": "one vector"
+        },
+        "galois null_space[0]": {
+          "setup": {
+            "min_ms": 0.11183414608240128,
+            "median_ms": 0.11366698890924454,
+            "p90_ms": 0.11908309534192085,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 2.901709172874689,
+            "median_ms": 2.9699578881263733,
+            "p90_ms": 3.2135420478880405,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.044692039489746094,
+            "resident_mib": 0.00384521484375
+          },
+          "note": "computes FULL basis, then takes row 0"
+        }
+      },
+      "equivalence": {
+        "gf2 nullspace_fast": "match",
+        "numpy-packed": "match",
+        "galois null_space[0]": "match"
+      },
+      "reference": "gf2 nullspace_fast",
+      "size": 64,
+      "density": 0.5
+    },
+    {
+      "operation": "multiply  (64x64 @ 64x64)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 0.29912497848272324,
+            "median_ms": 0.3010001964867115,
+            "p90_ms": 0.3060409799218178,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.18066680058836937,
+            "median_ms": 0.1955837942659855,
+            "p90_ms": 0.2343747764825821,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.00682830810546875,
+            "resident_mib": null
+          },
+          "note": ""
+        },
+        "numpy uint8 matmul": {
+          "setup": {
+            "min_ms": 0.1560421660542488,
+            "median_ms": 0.15925010666251183,
+            "p90_ms": 0.1604580320417881,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.07533421739935875,
+            "median_ms": 0.07562479004263878,
+            "p90_ms": 0.0766250304877758,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.008088111877441406,
+            "resident_mib": null
+          },
+          "note": "BLAS-backed, wraps mod 256"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 0.22812467068433762,
+            "median_ms": 0.23091677576303482,
+            "p90_ms": 0.239458866417408,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.021958258002996445,
+            "median_ms": 0.024584122002124786,
+            "p90_ms": 0.030499882996082306,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.09494876861572266,
+            "resident_mib": null
+          },
+          "note": ""
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy uint8 matmul": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 64,
+      "density": 0.5
+    },
+    {
+      "operation": "rank  (128x128)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 0.422667246311903,
+            "median_ms": 0.4620407707989216,
+            "p90_ms": 0.463124830275774,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.3408752381801605,
+            "median_ms": 0.35529211163520813,
+            "p90_ms": 0.36841677501797676,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.006404876708984375,
+            "resident_mib": 0.001953125
+          },
+          "note": "big-int elim; vectorised past n=384"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 0.3370833583176136,
+            "median_ms": 0.3398749977350235,
+            "p90_ms": 0.4127081483602524,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.8089169859886169,
+            "median_ms": 0.8338750340044498,
+            "p90_ms": 0.9080418385565281,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.00762939453125,
+            "resident_mib": 0.001953125
+          },
+          "note": "uint64 rows, vectorised XOR"
+        },
+        "numpy-naive": {
+          "setup": {
+            "min_ms": 0.2881670370697975,
+            "median_ms": 0.2955836243927479,
+            "p90_ms": 0.3837919794023037,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 2.820749767124653,
+            "median_ms": 2.977625001221895,
+            "p90_ms": 3.0578342266380787,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.14818572998046875,
+            "resident_mib": 0.015625
+          },
+          "note": "element-wise (strawman)"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 0.41858432814478874,
+            "median_ms": 0.43062493205070496,
+            "p90_ms": 0.4308749921619892,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 5.770041141659021,
+            "median_ms": 5.834375042468309,
+            "p90_ms": 5.96783310174942,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.058257102966308594,
+            "resident_mib": 0.015625
+          },
+          "note": "galois.GF(2)"
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy-packed": "match",
+        "numpy-naive": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 128,
+      "density": 0.5
+    },
+    {
+      "operation": "nullspace vector  (127x128)",
+      "results": {
+        "gf2 nullspace_fast": {
+          "setup": {
+            "min_ms": 8.335337042808533e-05,
+            "median_ms": 0.00012479722499847412,
+            "p90_ms": 0.00020815059542655945,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.8847499266266823,
+            "median_ms": 0.9465417824685574,
+            "p90_ms": 1.0050004348158836,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.0314483642578125,
+            "resident_mib": null
+          },
+          "note": "one vector"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 0.31299982219934464,
+            "median_ms": 0.3130831755697727,
+            "p90_ms": 0.31345896422863007,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 1.8060840666294098,
+            "median_ms": 1.8936251290142536,
+            "p90_ms": 1.9693751819431782,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.021341323852539062,
+            "resident_mib": 0.0019378662109375
+          },
+          "note": "one vector"
+        },
+        "galois null_space[0]": {
+          "setup": {
+            "min_ms": 0.38170814514160156,
+            "median_ms": 0.4076249897480011,
+            "p90_ms": 0.4163752309978008,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 6.404333282262087,
+            "median_ms": 6.775165908038616,
+            "p90_ms": 7.13870907202363,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.14060497283935547,
+            "resident_mib": 0.0155029296875
+          },
+          "note": "computes FULL basis, then takes row 0"
+        }
+      },
+      "equivalence": {
+        "gf2 nullspace_fast": "match",
+        "numpy-packed": "match",
+        "galois null_space[0]": "match"
+      },
+      "reference": "gf2 nullspace_fast",
+      "size": 128,
+      "density": 0.5
+    },
+    {
+      "operation": "multiply  (128x128 @ 128x128)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 1.1187498457729816,
+            "median_ms": 1.1204169131815434,
+            "p90_ms": 1.2067919597029686,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.2944162115454674,
+            "median_ms": 0.3142082132399082,
+            "p90_ms": 0.331999734044075,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.206787109375,
+            "resident_mib": null
+          },
+          "note": ""
+        },
+        "numpy uint8 matmul": {
+          "setup": {
+            "min_ms": 0.5807075649499893,
+            "median_ms": 0.587834045290947,
+            "p90_ms": 0.6021666340529919,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.6108330562710762,
+            "median_ms": 0.6849169731140137,
+            "p90_ms": 0.6955410353839397,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.031525611877441406,
+            "resident_mib": null
+          },
+          "note": "BLAS-backed, wraps mod 256"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 0.7869577966630459,
+            "median_ms": 0.8129999041557312,
+            "p90_ms": 0.8524167351424694,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.05570799112319946,
+            "median_ms": 0.058957841247320175,
+            "p90_ms": 0.07412489503622055,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.37610721588134766,
+            "resident_mib": null
+          },
+          "note": ""
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy uint8 matmul": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 128,
+      "density": 0.5
+    },
+    {
+      "operation": "rank  (256x256)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 1.7136246897280216,
+            "median_ms": 1.7338329926133156,
+            "p90_ms": 1.7451252788305283,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 1.3857921585440636,
+            "median_ms": 1.4739581383764744,
+            "p90_ms": 1.5091672539710999,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.016582489013671875,
+            "resident_mib": 0.0078125
+          },
+          "note": "big-int elim; vectorised past n=384"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 1.3128332793712616,
+            "median_ms": 1.579917035996914,
+            "p90_ms": 3.154417034238577,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 1.919624861329794,
+            "median_ms": 2.0110830664634705,
+            "p90_ms": 2.192957792431116,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.020111083984375,
+            "resident_mib": 0.0078125
+          },
+          "note": "uint64 rows, vectorised XOR"
+        },
+        "numpy-naive": {
+          "setup": {
+            "min_ms": 1.2428336776793003,
+            "median_ms": 1.247292384505272,
+            "p90_ms": 1.2515829876065254,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 11.698791291564703,
+            "median_ms": 11.794082820415497,
+            "p90_ms": 11.894790921360254,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.5817794799804688,
+            "resident_mib": 0.0625
+          },
+          "note": "element-wise (strawman)"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 1.6126250848174095,
+            "median_ms": 1.6178339719772339,
+            "p90_ms": 1.689333003014326,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 16.518292017281055,
+            "median_ms": 16.929875127971172,
+            "p90_ms": 17.283958848565817,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.17992210388183594,
+            "resident_mib": 0.0625
+          },
+          "note": "galois.GF(2)"
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy-packed": "match",
+        "numpy-naive": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 256,
+      "density": 0.5
+    },
+    {
+      "operation": "nullspace vector  (255x256)",
+      "results": {
+        "gf2 nullspace_fast": {
+          "setup": {
+            "min_ms": 4.237517714500427e-05,
+            "median_ms": 8.288770914077759e-05,
+            "p90_ms": 0.00012479722499847412,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 3.666291944682598,
+            "median_ms": 3.7037087604403496,
+            "p90_ms": 3.75183392316103,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.0530242919921875,
+            "resident_mib": null
+          },
+          "note": "one vector"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 1.2278747744858265,
+            "median_ms": 1.248084008693695,
+            "p90_ms": 1.3155420310795307,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 6.182124838232994,
+            "median_ms": 6.212334148585796,
+            "p90_ms": 6.2776668928563595,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.028260231018066406,
+            "resident_mib": 0.007781982421875
+          },
+          "note": "one vector"
+        },
+        "galois null_space[0]": {
+          "setup": {
+            "min_ms": 1.613125205039978,
+            "median_ms": 1.6231252811849117,
+            "p90_ms": 1.640500035136938,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 20.13758383691311,
+            "median_ms": 20.390542224049568,
+            "p90_ms": 20.7629157230258,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.5466804504394531,
+            "resident_mib": 0.062255859375
+          },
+          "note": "computes FULL basis, then takes row 0"
+        }
+      },
+      "equivalence": {
+        "gf2 nullspace_fast": "match",
+        "numpy-packed": "match",
+        "galois null_space[0]": "match"
+      },
+      "reference": "gf2 nullspace_fast",
+      "size": 256,
+      "density": 0.5
+    },
+    {
+      "operation": "multiply  (256x256 @ 256x256)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 4.265124909579754,
+            "median_ms": 4.288416355848312,
+            "p90_ms": 4.305500071495771,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.6825421005487442,
+            "median_ms": 0.7332088425755501,
+            "p90_ms": 0.7464592345058918,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.447021484375,
+            "resident_mib": null
+          },
+          "note": ""
+        },
+        "numpy uint8 matmul": {
+          "setup": {
+            "min_ms": 2.3392080329358578,
+            "median_ms": 2.3478749208152294,
+            "p90_ms": 2.387958113104105,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 5.05325011909008,
+            "median_ms": 5.194083787500858,
+            "p90_ms": 5.329667124897242,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.1252756118774414,
+            "resident_mib": null
+          },
+          "note": "BLAS-backed, wraps mod 256"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 3.078124951571226,
+            "median_ms": 3.207750152796507,
+            "p90_ms": 3.2598748803138733,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.21808315068483353,
+            "median_ms": 0.22741686552762985,
+            "p90_ms": 0.2311253920197487,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 1.5010461807250977,
+            "resident_mib": null
+          },
+          "note": ""
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy uint8 matmul": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 256,
+      "density": 0.5
+    },
+    {
+      "operation": "rank  (512x512)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 6.376416888087988,
+            "median_ms": 6.385083310306072,
+            "p90_ms": 6.440499797463417,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 4.758541937917471,
+            "median_ms": 4.860958084464073,
+            "p90_ms": 4.942042287439108,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.0712738037109375,
+            "resident_mib": 0.03125
+          },
+          "note": "big-int elim; vectorised past n=384"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 4.9345833249390125,
+            "median_ms": 4.940916784107685,
+            "p90_ms": 4.9734581261873245,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 4.705000203102827,
+            "median_ms": 4.881084430962801,
+            "p90_ms": 4.965208005160093,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.0712738037109375,
+            "resident_mib": 0.03125
+          },
+          "note": "uint64 rows, vectorised XOR"
+        },
+        "numpy-naive": {
+          "setup": {
+            "min_ms": 4.737208131700754,
+            "median_ms": 4.798542242497206,
+            "p90_ms": 4.806207958608866,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 52.98945773392916,
+            "median_ms": 53.58437541872263,
+            "p90_ms": 54.219499696046114,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 2.2927169799804688,
+            "resident_mib": 0.25
+          },
+          "note": "element-wise (strawman)"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 6.44620880484581,
+            "median_ms": 6.572291720658541,
+            "p90_ms": 6.603999994695187,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 62.17437516897917,
+            "median_ms": 63.314249739050865,
+            "p90_ms": 63.65566607564688,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.6869955062866211,
+            "resident_mib": 0.25
+          },
+          "note": "galois.GF(2)"
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy-packed": "match",
+        "numpy-naive": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 512,
+      "density": 0.5
+    },
+    {
+      "operation": "nullspace vector  (511x512)",
+      "results": {
+        "gf2 nullspace_fast": {
+          "setup": {
+            "min_ms": 8.288770914077759e-05,
+            "median_ms": 8.381903171539307e-05,
+            "p90_ms": 0.00012526288628578186,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 15.394791029393673,
+            "median_ms": 15.666374936699867,
+            "p90_ms": 16.249292064458132,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.19125747680664062,
+            "resident_mib": null
+          },
+          "note": "one vector"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 4.841958172619343,
+            "median_ms": 4.88445907831192,
+            "p90_ms": 5.011457949876785,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 22.118165623396635,
+            "median_ms": 22.297749761492014,
+            "p90_ms": 22.945167031139135,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.1219797134399414,
+            "resident_mib": 0.03118896484375
+          },
+          "note": "one vector"
+        },
+        "galois null_space[0]": {
+          "setup": {
+            "min_ms": 6.3477917574346066,
+            "median_ms": 6.403000093996525,
+            "p90_ms": 6.459041964262724,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 92.74725010618567,
+            "median_ms": 95.01883434131742,
+            "p90_ms": 95.28991719707847,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 2.1002016067504883,
+            "resident_mib": 0.24951171875
+          },
+          "note": "computes FULL basis, then takes row 0"
+        }
+      },
+      "equivalence": {
+        "gf2 nullspace_fast": "match",
+        "numpy-packed": "match",
+        "galois null_space[0]": "match"
+      },
+      "reference": "gf2 nullspace_fast",
+      "size": 512,
+      "density": 0.5
+    },
+    {
+      "operation": "multiply  (512x512 @ 512x512)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 12.847417034208775,
+            "median_ms": 12.855958193540573,
+            "p90_ms": 12.93466566130519,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 1.7114998772740364,
+            "median_ms": 1.7874171026051044,
+            "p90_ms": 1.9112499430775642,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 1.5175399780273438,
+            "resident_mib": null
+          },
+          "note": ""
+        },
+        "numpy uint8 matmul": {
+          "setup": {
+            "min_ms": 9.593416936695576,
+            "median_ms": 9.594500064849854,
+            "p90_ms": 9.616959374397993,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 70.70324989035726,
+            "median_ms": 71.15237507969141,
+            "p90_ms": 71.55729178339243,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.5002756118774414,
+            "resident_mib": null
+          },
+          "note": "BLAS-backed, wraps mod 256"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 12.64141732826829,
+            "median_ms": 12.772875372320414,
+            "p90_ms": 22.316124755889177,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 1.0449578985571861,
+            "median_ms": 1.2179580517113209,
+            "p90_ms": 1.659667119383812,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 6.001107215881348,
+            "resident_mib": null
+          },
+          "note": ""
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy uint8 matmul": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 512,
+      "density": 0.5
+    },
+    {
+      "operation": "rank  (1024x1024)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 25.36383317783475,
+            "median_ms": 25.47254180535674,
+            "p90_ms": 25.72029223665595,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 16.081165987998247,
+            "median_ms": 17.11554080247879,
+            "p90_ms": 19.878040999174118,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.2618560791015625,
+            "resident_mib": 0.125
+          },
+          "note": "big-int elim; vectorised past n=384"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 19.515374675393105,
+            "median_ms": 19.740417134016752,
+            "p90_ms": 19.78483283892274,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 16.27212530001998,
+            "median_ms": 17.447834368795156,
+            "p90_ms": 19.99520929530263,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.2618560791015625,
+            "resident_mib": 0.125
+          },
+          "note": "uint64 rows, vectorised XOR"
+        },
+        "numpy-naive": {
+          "setup": {
+            "min_ms": 18.953375052660704,
+            "median_ms": 19.05245892703533,
+            "p90_ms": 19.10008303821087,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 253.94937535747886,
+            "median_ms": 259.16537502780557,
+            "p90_ms": 279.93458276614547,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 9.089591979980469,
+            "resident_mib": 1.0
+          },
+          "note": "element-wise (strawman)"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 30.44883394613862,
+            "median_ms": 41.05491703376174,
+            "p90_ms": 41.35508323088288,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 350.68995878100395,
+            "median_ms": 374.83262503519654,
+            "p90_ms": 401.7484998330474,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 2.6806249618530273,
+            "resident_mib": 1.0
+          },
+          "note": "galois.GF(2)"
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy-packed": "match",
+        "numpy-naive": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 1024,
+      "density": 0.5
+    },
+    {
+      "operation": "nullspace vector  (1023x1024)",
+      "results": {
+        "gf2 nullspace_fast": {
+          "setup": {
+            "min_ms": 4.237517714500427e-05,
+            "median_ms": 8.288770914077759e-05,
+            "p90_ms": 0.00012479722499847412,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 63.461082987487316,
+            "median_ms": 64.9012909270823,
+            "p90_ms": 82.8713751398027,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.46167755126953125,
+            "resident_mib": null
+          },
+          "note": "one vector"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 20.402458030730486,
+            "median_ms": 20.480125211179256,
+            "p90_ms": 20.70483285933733,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 89.03029188513756,
+            "median_ms": 93.89133285731077,
+            "p90_ms": 162.26479224860668,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.2619171142578125,
+            "resident_mib": 0.1248779296875
+          },
+          "note": "one vector"
+        },
+        "galois null_space[0]": {
+          "setup": {
+            "min_ms": 33.91058323904872,
+            "median_ms": 33.91783405095339,
+            "p90_ms": 40.66320788115263,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 623.0140002444386,
+            "median_ms": 651.9524157047272,
+            "p90_ms": 679.1135407984257,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 8.319618225097656,
+            "resident_mib": 0.9990234375
+          },
+          "note": "computes FULL basis, then takes row 0"
+        }
+      },
+      "equivalence": {
+        "gf2 nullspace_fast": "match",
+        "numpy-packed": "match",
+        "galois null_space[0]": "match"
+      },
+      "reference": "gf2 nullspace_fast",
+      "size": 1024,
+      "density": 0.5
+    },
+    {
+      "operation": "multiply  (1024x1024 @ 1024x1024)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 73.12191696837544,
+            "median_ms": 73.2723749242723,
+            "p90_ms": 73.31870822235942,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 6.591374985873699,
+            "median_ms": 6.721249781548977,
+            "p90_ms": 8.050291799008846,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 6.142631530761719,
+            "resident_mib": null
+          },
+          "note": ""
+        },
+        "numpy uint8 matmul": {
+          "setup": {
+            "min_ms": 37.95937495306134,
+            "median_ms": 38.01295813173056,
+            "p90_ms": 38.33554219454527,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 580.86729189381,
+            "median_ms": 582.4103751219809,
+            "p90_ms": 604.7217501327395,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 2.0002756118774414,
+            "resident_mib": null
+          },
+          "note": "BLAS-backed, wraps mod 256"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 51.33558390662074,
+            "median_ms": 52.06333287060261,
+            "p90_ms": 52.255707792937756,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 5.412541329860687,
+            "median_ms": 6.1957500874996185,
+            "p90_ms": 8.379625156521797,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 24.001107215881348,
+            "resident_mib": null
+          },
+          "note": ""
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy uint8 matmul": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 1024,
+      "density": 0.5
+    },
+    {
+      "operation": "rank  (128x128)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 0.3633336164057255,
+            "median_ms": 0.3652498126029968,
+            "p90_ms": 0.37179235368967056,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.2999999560415745,
+            "median_ms": 0.30524982139468193,
+            "p90_ms": 0.37066731601953506,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.005558013916015625,
+            "resident_mib": 0.00360107421875
+          },
+          "note": "big-int elim; vectorised past n=384"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 0.2769157290458679,
+            "median_ms": 0.27750013396143913,
+            "p90_ms": 0.2777082845568657,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.8049998432397842,
+            "median_ms": 0.813458114862442,
+            "p90_ms": 0.9187501855194569,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.006500244140625,
+            "resident_mib": 0.001953125
+          },
+          "note": "uint64 rows, vectorised XOR"
+        },
+        "numpy-naive": {
+          "setup": {
+            "min_ms": 0.2771671861410141,
+            "median_ms": 0.2776249311864376,
+            "p90_ms": 0.2777082845568657,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 2.0148330368101597,
+            "median_ms": 2.061542123556137,
+            "p90_ms": 2.1447078324854374,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.14818572998046875,
+            "resident_mib": 0.015625
+          },
+          "note": "element-wise (strawman)"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 0.33295899629592896,
+            "median_ms": 0.3408752381801605,
+            "p90_ms": 0.37675024941563606,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 5.3424169309437275,
+            "median_ms": 5.521832965314388,
+            "p90_ms": 5.627041682600975,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.057769775390625,
+            "resident_mib": 0.015625
+          },
+          "note": "galois.GF(2)"
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy-packed": "match",
+        "numpy-naive": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 128,
+      "density": 0.05
+    },
+    {
+      "operation": "nullspace vector  (127x128)",
+      "results": {
+        "gf2 nullspace_fast": {
+          "setup": {
+            "min_ms": 8.335337042808533e-05,
+            "median_ms": 0.00012479722499847412,
+            "p90_ms": 0.00012526288628578186,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.8065830916166306,
+            "median_ms": 0.8232500404119492,
+            "p90_ms": 0.8655418641865253,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.03060150146484375,
+            "resident_mib": null
+          },
+          "note": "one vector"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 0.28400029987096786,
+            "median_ms": 0.2898750826716423,
+            "p90_ms": 0.321041326969862,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 1.751583069562912,
+            "median_ms": 1.8017501570284367,
+            "p90_ms": 2.133707981556654,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.021347999572753906,
+            "resident_mib": 0.0019378662109375
+          },
+          "note": "one vector"
+        },
+        "galois null_space[0]": {
+          "setup": {
+            "min_ms": 0.32920902594923973,
+            "median_ms": 0.33004069700837135,
+            "p90_ms": 0.3331671468913555,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 5.988875404000282,
+            "median_ms": 6.096375174820423,
+            "p90_ms": 6.286832969635725,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.14123821258544922,
+            "resident_mib": 0.0155029296875
+          },
+          "note": "computes FULL basis, then takes row 0"
+        }
+      },
+      "equivalence": {
+        "gf2 nullspace_fast": "match",
+        "numpy-packed": "match",
+        "galois null_space[0]": "match"
+      },
+      "reference": "gf2 nullspace_fast",
+      "size": 128,
+      "density": 0.05
+    },
+    {
+      "operation": "multiply  (128x128 @ 128x128)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 0.70583401247859,
+            "median_ms": 0.7061250507831573,
+            "p90_ms": 0.7082079537212849,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.12970808893442154,
+            "median_ms": 0.13483315706253052,
+            "p90_ms": 0.16008317470550537,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.015995025634765625,
+            "resident_mib": null
+          },
+          "note": ""
+        },
+        "numpy uint8 matmul": {
+          "setup": {
+            "min_ms": 0.5337088368833065,
+            "median_ms": 0.5437922663986683,
+            "p90_ms": 0.5686245858669281,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.6434591487050056,
+            "median_ms": 0.6463751196861267,
+            "p90_ms": 0.673332717269659,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.031525611877441406,
+            "resident_mib": null
+          },
+          "note": "BLAS-backed, wraps mod 256"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 0.6623337976634502,
+            "median_ms": 0.6664171814918518,
+            "p90_ms": 0.6680423393845558,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.06245775148272514,
+            "median_ms": 0.11841580271720886,
+            "p90_ms": 0.1305420882999897,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.37604618072509766,
+            "resident_mib": null
+          },
+          "note": ""
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy uint8 matmul": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 128,
+      "density": 0.05
+    },
+    {
+      "operation": "rank  (128x128)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 0.33787498250603676,
+            "median_ms": 0.345500186085701,
+            "p90_ms": 0.384707935154438,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.31183380633592606,
+            "median_ms": 0.31395768746733665,
+            "p90_ms": 0.31508365646004677,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.006465911865234375,
+            "resident_mib": 0.001953125
+          },
+          "note": "big-int elim; vectorised past n=384"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 0.2742921933531761,
+            "median_ms": 0.2743331715464592,
+            "p90_ms": 0.2776249311864376,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.8062086999416351,
+            "median_ms": 0.8114161901175976,
+            "p90_ms": 0.8326251991093159,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.009002685546875,
+            "resident_mib": 0.001953125
+          },
+          "note": "uint64 rows, vectorised XOR"
+        },
+        "numpy-naive": {
+          "setup": {
+            "min_ms": 0.26254216209053993,
+            "median_ms": 0.2627503126859665,
+            "p90_ms": 0.26299990713596344,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 2.2728331387043,
+            "median_ms": 2.2949171252548695,
+            "p90_ms": 2.3478753864765167,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.14818572998046875,
+            "resident_mib": 0.015625
+          },
+          "note": "element-wise (strawman)"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 0.3532920964062214,
+            "median_ms": 0.35408325493335724,
+            "p90_ms": 0.3585829399526119,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 5.425750277936459,
+            "median_ms": 5.577375181019306,
+            "p90_ms": 5.689332727342844,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.06460380554199219,
+            "resident_mib": 0.015625
+          },
+          "note": "galois.GF(2)"
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy-packed": "match",
+        "numpy-naive": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 128,
+      "density": 0.95
+    },
+    {
+      "operation": "nullspace vector  (127x128)",
+      "results": {
+        "gf2 nullspace_fast": {
+          "setup": {
+            "min_ms": 8.288770914077759e-05,
+            "median_ms": 8.288770914077759e-05,
+            "p90_ms": 8.381903171539307e-05,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.8386252447962761,
+            "median_ms": 0.8556246757507324,
+            "p90_ms": 0.8733337745070457,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.031551361083984375,
+            "resident_mib": null
+          },
+          "note": "one vector"
+        },
+        "numpy-packed": {
+          "setup": {
+            "min_ms": 0.27241697534918785,
+            "median_ms": 0.27791596949100494,
+            "p90_ms": 0.28516678139567375,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 1.7907093279063702,
+            "median_ms": 1.81974982842803,
+            "p90_ms": 1.8410831689834595,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.021347999572753906,
+            "resident_mib": 0.0019378662109375
+          },
+          "note": "one vector"
+        },
+        "galois null_space[0]": {
+          "setup": {
+            "min_ms": 0.33670803532004356,
+            "median_ms": 0.3369580954313278,
+            "p90_ms": 0.3408328630030155,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 6.00399961695075,
+            "median_ms": 6.075916811823845,
+            "p90_ms": 6.1822086572647095,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.17066192626953125,
+            "resident_mib": 0.0155029296875
+          },
+          "note": "computes FULL basis, then takes row 0"
+        }
+      },
+      "equivalence": {
+        "gf2 nullspace_fast": "match",
+        "numpy-packed": "match",
+        "galois null_space[0]": "match"
+      },
+      "reference": "gf2 nullspace_fast",
+      "size": 128,
+      "density": 0.95
+    },
+    {
+      "operation": "multiply  (128x128 @ 128x128)",
+      "results": {
+        "gf2": {
+          "setup": {
+            "min_ms": 0.685875304043293,
+            "median_ms": 0.7018749602138996,
+            "p90_ms": 0.7030419073998928,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.27566682547330856,
+            "median_ms": 0.28012460097670555,
+            "p90_ms": 0.4158336669206619,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.204742431640625,
+            "resident_mib": null
+          },
+          "note": ""
+        },
+        "numpy uint8 matmul": {
+          "setup": {
+            "min_ms": 0.5357922054827213,
+            "median_ms": 0.549541786313057,
+            "p90_ms": 0.5517918616533279,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.6438330747187138,
+            "median_ms": 0.6632092408835888,
+            "p90_ms": 0.7100827060639858,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.031525611877441406,
+            "resident_mib": null
+          },
+          "note": "BLAS-backed, wraps mod 256"
+        },
+        "galois": {
+          "setup": {
+            "min_ms": 0.681957695633173,
+            "median_ms": 0.6936248391866684,
+            "p90_ms": 0.7352498359978199,
+            "reps": 3,
+            "samples": null
+          },
+          "run": {
+            "min_ms": 0.06533414125442505,
+            "median_ms": 0.07416633889079094,
+            "p90_ms": 0.13679172843694687,
+            "reps": 7,
+            "samples": null
+          },
+          "memory": {
+            "peak_mib": 0.37604618072509766,
+            "resident_mib": null
+          },
+          "note": ""
+        }
+      },
+      "equivalence": {
+        "gf2": "match",
+        "numpy uint8 matmul": "match",
+        "galois": "match"
+      },
+      "reference": "gf2",
+      "size": 128,
+      "density": 0.95
+    }
+  ]
+}

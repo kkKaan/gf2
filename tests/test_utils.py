@@ -1,5 +1,5 @@
 """
-Mathematical verification and performance measurement utilities for binpy testing.
+Mathematical verification and performance measurement utilities for gf2 testing.
 
 This module provides:
 - MathVerifier: Utilities for verifying mathematical properties and correctness
@@ -25,10 +25,10 @@ except ImportError:
     _HAS_PSUTIL = False
     psutil = None
 
-from binpy.core import add, det, multiply, rank, trace, transpose
-from binpy.generators import identity, zeros
-from binpy.solvers import nullspace
-from binpy.sparse import DenseGF2Matrix, SparseGF2Matrix
+from gf2.core import add, det, multiply, rank, trace, transpose
+from gf2.generators import identity, zeros
+from gf2.solvers import nullspace
+from gf2.sparse import DenseGF2Matrix, SparseGF2Matrix
 
 
 @dataclass

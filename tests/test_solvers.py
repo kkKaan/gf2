@@ -1,5 +1,5 @@
 """
-Unit tests for binpy solver functions.
+Unit tests for gf2 solver functions.
 
 This module provides extensive testing for all solver functions including:
 - Linear system solving with various matrix types and edge cases
@@ -15,9 +15,9 @@ import hypothesis.strategies as st
 import pytest
 from hypothesis import given, settings
 
-from binpy.core import multiply, rank
-from binpy.generators import identity, ones, random_sparse, zeros
-from binpy.solvers import (
+from gf2.core import multiply, rank
+from gf2.generators import identity, ones, random_sparse, zeros
+from gf2.solvers import (
     condition_analysis,
     image,
     inverse,
@@ -30,7 +30,7 @@ from binpy.solvers import (
     solve,
     solve_multiple_rhs,
 )
-from binpy.sparse import SparseGF2Matrix
+from gf2.sparse import SparseGF2Matrix
 
 
 class MathVerifier:

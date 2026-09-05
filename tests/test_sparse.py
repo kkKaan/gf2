@@ -13,8 +13,8 @@ import numpy as np
 import pytest
 from hypothesis import given, strategies as st
 
-from binpy.generators import identity
-from binpy.sparse import DenseGF2Matrix, SparseGF2Matrix, create_sparse_matrix
+from gf2.generators import identity
+from gf2.sparse import DenseGF2Matrix, SparseGF2Matrix, create_sparse_matrix
 
 
 class TestSparseFormatSelection:

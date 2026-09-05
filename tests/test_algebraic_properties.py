@@ -10,10 +10,10 @@ import hypothesis.strategies as st
 import pytest
 from hypothesis import given, settings
 
-from binpy.core import add, det, is_invertible, multiply, rank, transpose
-from binpy.generators import identity, ones, random_sparse, zeros
-from binpy.solvers import inverse
-from binpy.sparse import SparseGF2Matrix
+from gf2.core import add, det, is_invertible, multiply, rank, transpose
+from gf2.generators import identity, ones, random_sparse, zeros
+from gf2.solvers import inverse
+from gf2.sparse import SparseGF2Matrix
 
 
 # Custom hypothesis strategies for matrix dimensions and sparsity levels

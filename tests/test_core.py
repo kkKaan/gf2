@@ -1,7 +1,7 @@
 import pytest
 
-from binpy.core import add, det, is_invertible, multiply, rank, transpose
-from binpy.generators import identity, zeros
+from gf2.core import add, det, is_invertible, multiply, rank, transpose
+from gf2.generators import identity, zeros
 
 
 @pytest.mark.unit

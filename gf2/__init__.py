@@ -1,5 +1,5 @@
 """
-binpy: Binary Linear Algebra over GF(2)
+gf2: Binary Linear Algebra over GF(2)
 ======================================
 
 High-performance binary matrix operations with optimized sparse and dense
@@ -7,8 +7,8 @@ storage, solvers, and generators. Applications include coding theory,
 cryptography, network coding, and quantum error correction.
 
 Quick start:
-    >>> from binpy.generators import identity
-    >>> from binpy.core import rank
+    >>> from gf2.generators import identity
+    >>> from gf2.core import rank
     >>> I = identity(8)
     >>> rank(I)
     8

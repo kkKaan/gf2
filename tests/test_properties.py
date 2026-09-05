@@ -1,12 +1,12 @@
-"""Property-based tests for binpy using Hypothesis."""
+"""Property-based tests for gf2 using Hypothesis."""
 
 import hypothesis.strategies as st
 import pytest
 from hypothesis import given, settings
 
-from binpy.core import add, multiply, rank, transpose
-from binpy.generators import identity, random_sparse, zeros
-from binpy.solvers import solve
+from gf2.core import add, multiply, rank, transpose
+from gf2.generators import identity, random_sparse, zeros
+from gf2.solvers import solve
 
 
 @pytest.mark.property

@@ -1,5 +1,5 @@
 """
-Comprehensive tests for matrix generators in binpy.
+Comprehensive tests for matrix generators in gf2.
 
 This module tests:
 - LDPC matrix generation with weight constraints
@@ -14,8 +14,8 @@ Requirements covered: 2.1, 2.2
 import pytest
 from hypothesis import given, strategies as st
 
-from binpy.core import add, multiply, rank, transpose
-from binpy.generators import (
+from gf2.core import add, multiply, rank, transpose
+from gf2.generators import (
     bch_matrix,
     bicycle_codes,
     circulant,
@@ -34,7 +34,7 @@ from binpy.generators import (
     vandermonde,
     zeros,
 )
-from binpy.sparse import SparseGF2Matrix
+from gf2.sparse import SparseGF2Matrix
 
 
 class TestLDPCGenerators:
@@ -781,143 +781,77 @@ class TestQuantumCodeGenerators:
         distance = 3
         H_x, H_z = surface_code_matrix(distance)
 
-        # Basic dimension checks
-        n_data = distance * distance
+        # Planar surface code = hypergraph product of two repetition codes,
+        # so n = d^2 + (d-1)^2 data qubits.
+        n_data = distance * distance + (distance - 1) * (distance - 1)
         assert H_x.cols == n_data
         assert H_z.cols == n_data
 
-        # Should be valid matrices
         assert isinstance(H_x, SparseGF2Matrix)
         assert isinstance(H_z, SparseGF2Matrix)
 
     @pytest.mark.unit
     def test_surface_code_stabilizer_properties(self):
-        """Test surface code stabilizer properties and structure."""
+        """Stabiliser counts and weights for the planar surface code."""
         distance = 3
         H_x, H_z = surface_code_matrix(distance)
 
-        # Test stabilizer dimensions
-        n_data = distance * distance  # 9 data qubits
-        expected_x_stabs = (distance - 1) * distance // 2  # Face operators
-        expected_z_stabs = distance * (distance - 1) // 2  # Star operators
-
-        assert H_x.rows == expected_x_stabs
-        assert H_z.rows == expected_z_stabs
+        n_data = distance * distance + (distance - 1) * (distance - 1)
+        # H_x has m*n2 = (d-1)*d rows, H_z has n1*m2 = d*(d-1) rows.
+        assert H_x.rows == (distance - 1) * distance
+        assert H_z.rows == distance * (distance - 1)
         assert H_x.cols == n_data
         assert H_z.cols == n_data
 
-        # Test that stabilizers have reasonable weights (allowing for simplified implementation)
-        total_x_weight = 0
-        non_zero_x_stabs = 0
-        for i in range(H_x.rows):
-            row_weight = sum(H_x.get(i, j) for j in range(H_x.cols))
-            if row_weight > 0:
-                non_zero_x_stabs += 1
-                total_x_weight += row_weight
-                assert row_weight <= 4, f"X stabilizer {i} has weight {row_weight}, expected ≤ 4"
-
-        # Should have at least some non-zero stabilizers
-        assert non_zero_x_stabs > 0, "Should have at least one non-zero X stabilizer"
-
-        total_z_weight = 0
-        non_zero_z_stabs = 0
-        for i in range(H_z.rows):
-            row_weight = sum(H_z.get(i, j) for j in range(H_z.cols))
-            if row_weight > 0:
-                non_zero_z_stabs += 1
-                total_z_weight += row_weight
-                assert row_weight <= 4, f"Z stabilizer {i} has weight {row_weight}, expected ≤ 4"
-
-        # Should have at least some non-zero stabilizers
-        assert non_zero_z_stabs > 0, "Should have at least one non-zero Z stabilizer"
+        # Every stabiliser is non-empty and acts on at most 4 qubits.
+        for H, label in ((H_x, "X"), (H_z, "Z")):
+            for i, row in enumerate(H.get_all_rows_bitwise()):
+                weight = row.bit_count()
+                assert weight > 0, f"{label} stabilizer {i} is empty"
+                assert weight <= 4, f"{label} stabilizer {i} has weight {weight}, expected <= 4"
 
     @pytest.mark.unit
     def test_surface_code_commutation_relations(self):
-        """Test that surface code stabilizers satisfy commutation relations."""
+        """H_x @ H_z^T must be exactly zero - this is the CSS condition."""
         distance = 3
         H_x, H_z = surface_code_matrix(distance)
 
-        # Test that matrices are well-formed
-        assert H_x.rows > 0 and H_x.cols > 0
-        assert H_z.rows > 0 and H_z.cols > 0
-
-        # For CSS codes, H_x and H_z should ideally satisfy H_x * H_z^T = 0
-        # However, the simplified implementation may not achieve perfect commutation
-        # So we test that the commutator has reasonable properties
-        H_z_T = transpose(H_z)
-        product = multiply(H_x, H_z_T)
-
-        # Count non-zero entries in commutator
-        non_zero_count = 0
-        for i in range(product.rows):
-            for j in range(product.cols):
-                if product.get(i, j) != 0:
-                    non_zero_count += 1
-
-        # For a simplified implementation, we allow some non-zero commutators
-        # but they should be a small fraction of the total
-        total_entries = product.rows * product.cols
-        commutation_error_rate = non_zero_count / total_entries if total_entries > 0 else 0
-
-        # Allow up to 50% commutation errors for simplified implementation
-        assert commutation_error_rate <= 0.5, f"Too many commutation errors: {commutation_error_rate:.2%}"
-
-        # Test self-commutation properties
-        H_x_T = transpose(H_x)
-        x_self_product = multiply(H_x, H_x_T)
-
-        # Self-product should be symmetric
-        for i in range(min(3, x_self_product.rows)):  # Test first few entries
-            for j in range(min(3, x_self_product.cols)):
-                assert x_self_product.get(i, j) == x_self_product.get(j, i), (
-                    f"Self-product not symmetric at ({i},{j})"
-                )
+        product = multiply(H_x, transpose(H_z))
+        assert not any(product.get_all_rows_bitwise()), (
+            "surface code stabilizers do not commute: H_x @ H_z^T != 0"
+        )
 
     @pytest.mark.unit
     def test_surface_code_different_distances(self):
-        """Test surface codes with different distances."""
-        for distance in [3, 5]:
+        """Exact commutation and qubit count at several distances."""
+        for distance in [3, 5, 7]:
             H_x, H_z = surface_code_matrix(distance)
 
-            n_data = distance * distance
+            n_data = distance * distance + (distance - 1) * (distance - 1)
             assert H_x.cols == n_data
             assert H_z.cols == n_data
 
-            # Verify basic structure (allowing for simplified implementation)
-            H_z_T = transpose(H_z)
-            product = multiply(H_x, H_z_T)
-
-            # Count commutation errors
-            non_zero_count = sum(
-                1 for i in range(product.rows) for j in range(product.cols) if product.get(i, j) != 0
-            )
-            total_entries = product.rows * product.cols
-            error_rate = non_zero_count / total_entries if total_entries > 0 else 0
-
-            # Allow reasonable error rate for simplified implementation
-            assert error_rate <= 0.6, f"Distance {distance}: too many commutation errors: {error_rate:.2%}"
+            product = multiply(H_x, transpose(H_z))
+            assert not any(product.get_all_rows_bitwise()), f"distance {distance}: H_x @ H_z^T != 0"
 
     @pytest.mark.unit
-    def test_surface_code_error_correction_properties(self):
-        """Test surface code quantum error correction properties."""
-        distance = 3
-        H_x, H_z = surface_code_matrix(distance)
+    def test_surface_code_encodes_one_logical_qubit(self):
+        """k = n - rank(H_x) - rank(H_z) must be 1 for the planar code."""
+        for distance in [3, 5]:
+            H_x, H_z = surface_code_matrix(distance)
+            n_data = distance * distance + (distance - 1) * (distance - 1)
+            k = n_data - rank(H_x) - rank(H_z)
+            assert k == 1, f"distance {distance}: expected k=1 logical qubit, got {k}"
 
-        # Test that the code has the expected parameters
-        _n_data = distance * distance
-
-        # For surface codes, the number of logical qubits is typically 1
-        # The code distance should be related to the lattice distance
-
-        # Test that stabilizers are linearly independent (full rank)
-        x_rank = rank(H_x)
-        z_rank = rank(H_z)
-
-        # Ranks should be reasonable (not zero, not exceeding dimensions)
-        assert x_rank > 0, "X stabilizers should be linearly independent"
-        assert z_rank > 0, "Z stabilizers should be linearly independent"
-        assert x_rank <= min(H_x.rows, H_x.cols)
-        assert z_rank <= min(H_z.rows, H_z.cols)
+    @pytest.mark.unit
+    def test_surface_code_rejects_invalid_distance(self):
+        """Even and too-small distances are rejected, not silently accepted."""
+        with pytest.raises(ValueError):
+            surface_code_matrix(4)
+        with pytest.raises(ValueError):
+            surface_code_matrix(1)
+        with pytest.raises(NotImplementedError):
+            surface_code_matrix(3, boundary="periodic")
 
     @pytest.mark.unit
     def test_color_code_basic(self):
@@ -1070,75 +1004,89 @@ class TestQuantumCodeGenerators:
     @pytest.mark.unit
     def test_hypergraph_product_basic(self):
         """Test basic hypergraph product construction."""
-        # Use small classical codes
         H1 = hamming_matrix(2)  # Small Hamming code
         H2 = hamming_matrix(2)  # Same code
 
         H_x, H_z = hypergraph_product(H1, H2)
 
-        # Check dimensions
+        # Tillich-Zemor: n = n1*n2 + m1*m2 qubits.
         m1, n1 = H1.rows, H1.cols
         m2, n2 = H2.rows, H2.cols
-        expected_qubits = n1 * m2 + m1 * n2
+        expected_qubits = n1 * n2 + m1 * m2
 
         assert H_x.cols == expected_qubits
         assert H_z.cols == expected_qubits
+        assert H_x.rows == m1 * n2
+        assert H_z.rows == n1 * m2
 
-        # Should be valid matrices
+        # H_z must actually carry entries. It used to come back all zero,
+        # which made the commutation test below pass vacuously.
+        assert H_z.nnz > 0, "H_z is empty - the Z block was never constructed"
+        assert H_x.nnz > 0
+
         assert isinstance(H_x, SparseGF2Matrix)
         assert isinstance(H_z, SparseGF2Matrix)
 
     @pytest.mark.unit
     def test_hypergraph_product_construction_correctness(self):
-        """Test hypergraph product construction correctness."""
-        # Use simple 2x3 matrices for testing
-        from binpy.sparse import create_sparse_matrix
+        """H_x's first block must equal H1 (x) I_n2 entry for entry."""
+        from gf2.sparse import create_sparse_matrix
 
-        # Create simple test matrices
         H1 = create_sparse_matrix(2, 3, coordinates=[(0, 0), (0, 2), (1, 1)])  # 2x3
         H2 = create_sparse_matrix(2, 3, coordinates=[(0, 1), (1, 0), (1, 2)])  # 2x3
 
         H_x, H_z = hypergraph_product(H1, H2)
 
-        # Check dimensions
         m1, n1 = H1.rows, H1.cols  # 2, 3
         m2, n2 = H2.rows, H2.cols  # 2, 3
-        expected_qubits = n1 * m2 + m1 * n2  # 3*2 + 2*3 = 12
+        expected_qubits = n1 * n2 + m1 * m2  # 3*3 + 2*2 = 13
 
         assert H_x.cols == expected_qubits
         assert H_z.cols == expected_qubits
-        assert H_x.rows == m1 * m2  # 2*2 = 4
+        assert H_x.rows == m1 * n2  # 2*3 = 6
+        assert H_z.rows == n1 * m2  # 3*2 = 6
 
-        # Test that construction follows hypergraph product structure
-        # H_x should have block structure related to H1 ⊗ I and I ⊗ H2^T
+        # H_x = [ H1 (x) I_n2 | I_m1 (x) H2^T ]: row (c, b), column (a, b).
+        for c in range(m1):
+            for b in range(n2):
+                row_idx = c * n2 + b
+                for a in range(n1):
+                    col_idx = a * n2 + b
+                    assert H_x.get(row_idx, col_idx) == H1.get(c, a), (
+                        f"H1 (x) I block wrong at ({row_idx},{col_idx})"
+                    )
 
-        # Verify first block structure (H1 ⊗ I_m2)
-        for i in range(m1):  # 0, 1
-            for k in range(m2):  # 0, 1
-                row_idx = i * m2 + k
-                for j in range(n1):  # 0, 1, 2
-                    col_idx = j * m2 + k
-                    expected = H1.get(i, j)
-                    actual = H_x.get(row_idx, col_idx)
-                    assert actual == expected, f"Block structure error at ({row_idx},{col_idx})"
+        # H_z = [ I_n1 (x) H2 | H1^T (x) I_m2 ]: row (a, d), column (a, b).
+        for a in range(n1):
+            for d in range(m2):
+                row_idx = a * m2 + d
+                for b in range(n2):
+                    col_idx = a * n2 + b
+                    assert H_z.get(row_idx, col_idx) == H2.get(d, b), (
+                        f"I (x) H2 block wrong at ({row_idx},{col_idx})"
+                    )
 
     @pytest.mark.unit
     def test_hypergraph_product_commutation_relations(self):
-        """Test hypergraph product commutation relations."""
-        # Use small matrices to test commutation
-        H1 = hamming_matrix(2)  # 2x3 matrix
-        H2 = hamming_matrix(2)  # 2x3 matrix
+        """H_x @ H_z^T == 0 for arbitrary (including asymmetric) inputs."""
+        from gf2.sparse import create_sparse_matrix
 
-        H_x, H_z = hypergraph_product(H1, H2)
+        cases = [
+            (hamming_matrix(2), hamming_matrix(2)),
+            (hamming_matrix(3), hamming_matrix(2)),
+            (
+                create_sparse_matrix(2, 4, coordinates=[(0, 0), (0, 3), (1, 1), (1, 2)]),
+                create_sparse_matrix(3, 3, coordinates=[(0, 0), (1, 1), (2, 2), (0, 2)]),
+            ),
+        ]
 
-        # Test commutation: H_x * H_z^T = 0
-        H_z_T = transpose(H_z)
-        product = multiply(H_x, H_z_T)
-
-        # Product should be zero matrix
-        for i in range(product.rows):
-            for j in range(product.cols):
-                assert product.get(i, j) == 0, f"Non-zero commutator at ({i},{j})"
+        for H1, H2 in cases:
+            H_x, H_z = hypergraph_product(H1, H2)
+            assert H_z.nnz > 0, "H_z is empty; commutation would hold vacuously"
+            product = multiply(H_x, transpose(H_z))
+            assert not any(product.get_all_rows_bitwise()), (
+                f"Non-zero commutator for H1={H1.rows}x{H1.cols}, H2={H2.rows}x{H2.cols}"
+            )
 
     @pytest.mark.unit
     def test_bicycle_codes_basic(self):
@@ -1268,24 +1216,15 @@ class TestQuantumCodeGenerators:
         """Property-based test for surface codes."""
         H_x, H_z = surface_code_matrix(distance)
 
-        # Basic properties
-        n_data = distance * distance
+        # Planar surface code: n = d^2 + (d-1)^2 qubits, k = 1 logical qubit.
+        n_data = distance * distance + (distance - 1) * (distance - 1)
         assert H_x.cols == n_data
         assert H_z.cols == n_data
+        assert n_data - rank(H_x) - rank(H_z) == 1
 
-        # Commutation relations (allowing for simplified implementation)
-        H_z_T = transpose(H_z)
-        product = multiply(H_x, H_z_T)
-
-        # Count commutation errors
-        non_zero_count = sum(
-            1 for i in range(product.rows) for j in range(product.cols) if product.get(i, j) != 0
-        )
-        total_entries = product.rows * product.cols
-        error_rate = non_zero_count / total_entries if total_entries > 0 else 0
-
-        # Allow reasonable error rate for simplified implementation
-        assert error_rate <= 0.7, f"Distance {distance}: too many commutation errors: {error_rate:.2%}"
+        # CSS commutation must hold exactly - no tolerance.
+        product = multiply(H_x, transpose(H_z))
+        assert not any(product.get_all_rows_bitwise()), f"Distance {distance}: H_x @ H_z^T != 0"
 
     @pytest.mark.property
     @given(st.integers(min_value=2, max_value=5))

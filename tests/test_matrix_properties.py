@@ -1,5 +1,5 @@
 """
-Matrix-specific property tests for binpy.
+Matrix-specific property tests for gf2.
 
 This module implements property-based testing for matrix-specific properties
 including transpose properties, rank-nullity theorem verification, and
@@ -10,7 +10,7 @@ import hypothesis.strategies as st
 import pytest
 from hypothesis import given, settings
 
-from binpy.core import (
+from gf2.core import (
     add,
     det,
     is_invertible,
@@ -22,9 +22,9 @@ from binpy.core import (
     trace,
     transpose,
 )
-from binpy.generators import identity, random_sparse, zeros
-from binpy.solvers import inverse, nullspace, rank_nullity_theorem, solve
-from binpy.sparse import SparseGF2Matrix
+from gf2.generators import identity, random_sparse, zeros
+from gf2.solvers import inverse, nullspace, rank_nullity_theorem, solve
+from gf2.sparse import SparseGF2Matrix
 
 
 # Custom hypothesis strategies

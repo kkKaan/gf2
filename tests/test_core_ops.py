@@ -1,5 +1,5 @@
 """
-Comprehensive core operations tests for binpy.
+Comprehensive core operations tests for gf2.
 
 This module provides exhaustive testing of core GF(2) matrix operations:
 - Addition (XOR) with mathematical property verification
@@ -12,9 +12,9 @@ This module provides exhaustive testing of core GF(2) matrix operations:
 import pytest
 from hypothesis import given, strategies as st
 
-from binpy.core import add, det, multiply, rank, trace, transpose
-from binpy.generators import identity, random_sparse, zeros
-from binpy.sparse import SparseGF2Matrix
+from gf2.core import add, det, multiply, rank, trace, transpose
+from gf2.generators import identity, random_sparse, zeros
+from gf2.sparse import SparseGF2Matrix
 
 
 class TestAdditionOperation:

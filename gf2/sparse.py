@@ -22,6 +22,31 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+def _int_from_words(words: np.ndarray) -> int:
+    """Concatenate little-endian uint64 words into one Python int.
+
+    ``int.from_bytes`` does this in C. Building it with a ``|=`` loop is
+    quadratic in the word count because each step reallocates the whole int.
+    """
+    return int.from_bytes(words.tobytes(), "little")
+
+
+def _set_bit_positions(value: int) -> list[int]:
+    """Indices of the set bits of ``value``, cheapest-first.
+
+    Isolating the low bit with ``value & -value`` costs one machine-word pass
+    per set bit. Shifting right one bit at a time costs one pass per *column*,
+    which is why the previous ``while value: value >>= 1`` loops were
+    quadratic on wide rows.
+    """
+    out = []
+    while value:
+        low = value & -value
+        out.append(low.bit_length() - 1)
+        value ^= low
+    return out
+
+
 @dataclass
 class SparseStats:
     """Statistics about sparse matrix storage efficiency."""
@@ -109,9 +134,25 @@ class SparseGF2Matrix:
             self._to_bitpacked(matrix)
 
     def _from_coordinates(self, rows: list[int], cols: list[int], format_hint: str):
-        """Convert from coordinate (COO) format."""
+        """Convert from coordinate (COO) format.
+
+        Coordinates carry *set* semantics: listing (i, j) twice sets the bit
+        once. Duplicates used to be stored twice, which left ``nnz`` and every
+        density-derived decision reporting more entries than the matrix holds.
+        """
+        if len(rows) != len(cols):
+            raise ValueError("row and column index lists must be the same length")
+        for i, j in zip(rows, cols, strict=False):
+            if not (0 <= i < self.rows and 0 <= j < self.cols):
+                raise IndexError(f"coordinate ({i}, {j}) outside {self.rows}x{self.cols} matrix")
+
+        unique = sorted(set(zip(rows, cols, strict=False)))
+        rows = [i for i, _ in unique]
+        cols = [j for _, j in unique]
+
         self.nnz = len(rows)
-        density = self.nnz / (self.rows * self.cols)
+        cells = self.rows * self.cols
+        density = self.nnz / cells if cells > 0 else 0.0
 
         # Auto-select format based on density
         if format_hint == "auto":
@@ -138,6 +179,10 @@ class SparseGF2Matrix:
                     row_nnz += 1
             self.csr_row_ptr.append(self.csr_row_ptr[-1] + row_nnz)
 
+        self.nnz = len(self.csr_col_ind)
+        # A mutation path may have called us with a stale cache in place.
+        self._packed_rows_cache = None
+
         # Use compact indices for very sparse matrices
         if self.format == "csr_compact" and self.cols <= 65535:
             # Use 16-bit indices instead of 32-bit
@@ -156,27 +201,28 @@ class SparseGF2Matrix:
         # OPTIMIZATION: Build packed rows cache at the same time
         packed_cache = []
 
-        for i, row in enumerate(matrix):
-            # Pack entire row into Python integer first
-            row_packed = 0
-            for j, val in enumerate(row):
-                if val & 1:
-                    row_packed |= 1 << j
-
-            packed_cache.append(row_packed)
-
-            # Then split into 64-bit words for storage
-            for word_idx in range(words_per_row):
-                shift = word_idx * 64
-                word_bits = (row_packed >> shift) & 0xFFFFFFFFFFFFFFFF
-                self.bitpacked_rows[i, word_idx] = word_bits
+        # Pack the whole matrix at once. np.packbits is a C loop; the previous
+        # per-element ``row_packed |= 1 << j`` was O(cols^2 / 64) per row
+        # because every OR reallocated the growing integer.
+        dense = np.zeros((self.rows, words_per_row * 64), dtype=np.uint8)
+        if matrix:
+            supplied = np.asarray(matrix, dtype=np.uint8) & 1
+            dense[: supplied.shape[0], : supplied.shape[1]] = supplied
+        # packbits is MSB-first inside each byte; reverse each byte's bits so
+        # that column j lands on bit j.
+        packed = np.packbits(
+            dense.reshape(self.rows, words_per_row * 8, 8)[:, :, ::-1].reshape(self.rows, -1),
+            axis=1,
+        )
+        self.bitpacked_rows = np.ascontiguousarray(packed.view(np.uint64))
+        packed_cache = [_int_from_words(self.bitpacked_rows[i]) for i in range(self.rows)]
 
         # Cache the packed rows for fast access
         self._packed_rows_cache = packed_cache
 
     def _coo_to_csr(self, row_indices: list[int], col_indices: list[int]):
         """Convert coordinate format to CSR."""
-        # Sort by row index
+        # _from_coordinates already de-duplicated and sorted by (row, col).
         sorted_pairs = sorted(zip(row_indices, col_indices, strict=False))
 
         self.csr_row_ptr = [0] * (self.rows + 1)
@@ -226,6 +272,10 @@ class SparseGF2Matrix:
             self._packed_rows_cache = [self.get_row_bitwise(i) for i in range(self.rows)]
         return self._packed_rows_cache
 
+    def rows_bitwise(self) -> list[int]:
+        """A private copy of the packed rows, safe for in-place elimination."""
+        return self.get_all_rows_bitwise()[:]
+
     def get_row_bitwise(self, row_idx: int) -> int:
         """
         Get row as packed integer for bitwise operations.
@@ -241,12 +291,7 @@ class SparseGF2Matrix:
                 raise ValueError("Bitpacked rows not initialized")
             if self.cols <= 64:
                 return int(self.bitpacked_rows[row_idx, 0])
-            else:
-                # Combine multiple 64-bit words into a Python int
-                result = 0
-                for i, word in enumerate(self.bitpacked_rows[row_idx]):
-                    result |= int(word) << (i * 64)
-                return result
+            return _int_from_words(self.bitpacked_rows[row_idx])
 
         elif self.format in ["csr", "csr_compact"]:
             # Convert CSR row to packed integer
@@ -274,9 +319,17 @@ class SparseGF2Matrix:
         Set matrix from list of packed row integers.
         Efficient interface for your existing algorithms.
         """
+        if len(packed_rows) != self.rows:
+            raise ValueError(f"expected {self.rows} packed rows, got {len(packed_rows)}")
+        # Bits at or beyond ``cols`` have no column to live in. Silently keeping
+        # them in the cache made get_row_bitwise and get_bit disagree, and
+        # inflated nnz / density / rank.
+        width_mask = (1 << self.cols) - 1
+        packed_rows = [int(row) & width_mask for row in packed_rows]
+
         # Analyze sparsity to select format
         total_bits = len(packed_rows) * self.cols
-        set_bits = sum(bin(row).count("1") for row in packed_rows)
+        set_bits = sum(row.bit_count() for row in packed_rows)
         density = set_bits / total_bits if total_bits > 0 else 0
 
         self.nnz = set_bits
@@ -297,16 +350,7 @@ class SparseGF2Matrix:
         self.csr_col_ind = []
 
         for row_val in packed_rows:
-            len(self.csr_col_ind)
-
-            # Extract set bits
-            col = 0
-            while row_val > 0:
-                if row_val & 1:
-                    self.csr_col_ind.append(col)
-                row_val >>= 1
-                col += 1
-
+            self.csr_col_ind.extend(_set_bit_positions(row_val))
             self.csr_row_ptr.append(len(self.csr_col_ind))
 
         # Convert to numpy arrays
@@ -321,15 +365,12 @@ class SparseGF2Matrix:
         words_per_row = (self.cols + 63) // 64
         self.bitpacked_rows = np.zeros((self.rows, words_per_row), dtype=np.uint64)
 
+        nbytes = words_per_row * 8
         for i, row_val in enumerate(packed_rows):
-            # Ensure row_val is a Python int
-            row_val = int(row_val) if hasattr(row_val, "__int__") else row_val
-
-            for word_idx in range(words_per_row):
-                # Extract 64-bit word at the correct offset
-                shift = word_idx * 64
-                word_bits = (row_val >> shift) & 0xFFFFFFFFFFFFFFFF  # 64-bit mask
-                self.bitpacked_rows[i, word_idx] = word_bits
+            row_val = int(row_val)
+            # to_bytes slices the integer in one C pass; the previous loop
+            # shifted the full-width integer once per word, which is quadratic.
+            self.bitpacked_rows[i] = np.frombuffer(row_val.to_bytes(nbytes, "little"), dtype=np.uint64)
 
     def memory_usage(self) -> SparseStats:
         """Calculate memory usage statistics."""
@@ -370,20 +411,38 @@ class SparseGF2Matrix:
 
     def set_bit(self, row: int, col: int):
         """Set bit at (row, col) to 1."""
-        # For simplicity, convert to dense format, modify, and convert back
-        # This is not efficient but works for testing
-        dense_matrix = self.to_dense()
-        dense_matrix[row][col] = 1
-        self._from_dense(dense_matrix, self.format)
+        self._assign_bit(row, col, 1)
+
+    def clear_bit(self, row: int, col: int):
+        """Set bit at (row, col) to 0."""
+        self._assign_bit(row, col, 0)
+
+    def _assign_bit(self, row: int, col: int, value: int):
+        """Write one bit, keeping every representation consistent.
+
+        Goes through the packed rows rather than a dense round-trip. The old
+        path rebuilt an entire dense list of lists per write (O(rows*cols)),
+        never refreshed ``_packed_rows_cache`` on the CSR branch -- so later
+        reads returned the pre-write row -- and dropped the write entirely on
+        an "empty"-format matrix, because ``_from_dense`` has no branch for it.
+        """
+        if not (0 <= row < self.rows and 0 <= col < self.cols):
+            raise IndexError(f"({row}, {col}) outside {self.rows}x{self.cols} matrix")
+
+        packed = list(self.get_all_rows_bitwise())
+        if value & 1:
+            packed[row] |= 1 << col
+        else:
+            packed[row] &= ~(1 << col)
+        self.set_from_packed_rows(packed)
 
     def get(self, row: int, col: int) -> int:
         """Get element at (row, col). Alias for get_bit for compatibility."""
         return self.get_bit(row, col)
 
     def set(self, row: int, col: int, value: int):
-        """Set element at (row, col). Only supports setting to 1 (use for compatibility)."""
-        if value:
-            self.set_bit(row, col)
+        """Set element at (row, col) to 0 or 1."""
+        self._assign_bit(row, col, value)
 
     def get_bit(self, row: int, col: int) -> int:
         """Get bit at (row, col)."""
@@ -412,15 +471,36 @@ class SparseGF2Matrix:
 
     def to_dense(self) -> list[list[int]]:
         """Convert back to dense format for debugging/testing."""
-        result = [[0] * self.cols for _ in range(self.rows)]
+        if self.rows == 0 or self.cols == 0:
+            return [[0] * self.cols for _ in range(self.rows)]
 
-        for i in range(self.rows):
-            row_packed = self.get_row_bitwise(i)
-            for j in range(self.cols):
-                if (row_packed >> j) & 1:
-                    result[i][j] = 1
+        # One C-level unpack for the whole matrix. Both a shift per element and
+        # a set-bit walk per row spend their time in the interpreter instead.
+        bits = np.unpackbits(self.packed_u64().view(np.uint8), axis=1, bitorder="little")
+        return bits[:, : self.cols].astype(np.int64).tolist()
 
-        return result
+    def packed_u64(self) -> np.ndarray:
+        """Rows as a contiguous (rows, words) little-endian uint64 array.
+
+        This is the layout the vectorised GF(2) kernels in :mod:`gf2.core`
+        consume, so it is materialised once here rather than per call site.
+        """
+        words = (self.cols + 63) // 64
+        if (
+            self.format == "bitpacked"
+            and self.bitpacked_rows is not None
+            and self.bitpacked_rows.shape[1] == words
+        ):
+            return self.bitpacked_rows
+        out = np.zeros((self.rows, max(words, 1)), dtype=np.uint64)
+        nbytes = max(words, 1) * 8
+        for i, value in enumerate(self.get_all_rows_bitwise()):
+            out[i] = np.frombuffer(int(value).to_bytes(nbytes, "little"), dtype=np.uint64)
+        return out
+
+    def invalidate_cache(self) -> None:
+        """Drop the packed-row cache. Call after mutating the backing store."""
+        self._packed_rows_cache = None
 
     def __repr__(self):
         stats = self.memory_usage()
@@ -495,7 +575,10 @@ class DenseGF2Matrix:
         """Calculate memory usage and basic stats for dense matrix."""
         # nnz = int(np.count_nonzero(self.data)) * 64
         # Approximated nnz from stored words is coarse; compute exact count instead
-        exact_nnz = int(np.sum([bin(int(w)).count("1") for w in self.data.flatten()]))
+        if hasattr(np, "bitwise_count"):  # numpy >= 2.0, vectorised popcount
+            exact_nnz = int(np.bitwise_count(self.data).sum())
+        else:
+            exact_nnz = int(sum(int(w).bit_count() for w in self.data.ravel()))
         total_bits = self.rows * self.cols
         density = exact_nnz / total_bits if total_bits > 0 else 0
         memory_bytes = self.data.nbytes

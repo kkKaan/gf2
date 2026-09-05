@@ -10,10 +10,10 @@ import hypothesis.strategies as st
 import pytest
 from hypothesis import given, settings
 
-from binpy.core import multiply, rank
-from binpy.generators import identity, random_sparse, zeros
-from binpy.solvers import inverse, nullspace, solve
-from binpy.sparse import SparseGF2Matrix
+from gf2.core import multiply, rank
+from gf2.generators import identity, random_sparse, zeros
+from gf2.solvers import inverse, nullspace, solve
+from gf2.sparse import SparseGF2Matrix
 
 
 # Custom hypothesis strategies for solver testing
@@ -425,7 +425,7 @@ def test_homogeneous_system_nullspace_consistency_property(dims):
 @settings(max_examples=10, deadline=2000)
 def test_single_element_solver_properties(n):
     """Property test: 1x1 matrix solver properties."""
-    from binpy.generators import ones
+    from gf2.generators import ones
 
     # Test 1x1 matrix with value 1 (use ones generator to avoid set method issues)
     A_one = ones(1, 1)

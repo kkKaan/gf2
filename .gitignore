@@ -213,3 +213,5 @@ __marimo__/
 .DS_Store
 
 .kiro/
+# graphify knowledge graph (regenerate with: graphify update .)
+graphify-out/

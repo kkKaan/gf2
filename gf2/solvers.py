@@ -20,7 +20,7 @@ import time
 
 import numpy as np
 
-from .core import gaussian_elimination_inplace
+from .core import _rows_of, gaussian_elimination_inplace
 from .sparse import DenseGF2Matrix, SparseGF2Matrix
 
 
@@ -38,44 +38,29 @@ def solve(A: SparseGF2Matrix | DenseGF2Matrix, b: list[int] | np.ndarray) -> lis
     if A.rows != len(b):
         raise ValueError("Matrix and vector dimensions must match")
 
-    # Convert to packed representation
-    rows = []
-    for i in range(A.rows):
-        row_packed = A.get_row_bitwise(i)
-        # Append b[i] as the least significant bit beyond the matrix columns
-        augmented_row = row_packed | (b[i] << A.cols)
-        rows.append(augmented_row)
+    # Augment: b[i] rides along as bit A.cols of row i.
+    rhs_bit = 1 << A.cols
+    rows = [row | (rhs_bit if int(b[i]) & 1 else 0) for i, row in enumerate(_rows_of(A))]
 
-    # Perform Gaussian elimination on augmented matrix
-    rref_rows, pivot_cols = gaussian_elimination_inplace(rows, A.cols + 1)
+    # Eliminate over the coefficient columns ONLY. Letting the elimination
+    # pivot on the augmented column would put A.cols into pivot_cols and index
+    # past the end of the solution vector during back-substitution.
+    all_rows, pivot_cols = gaussian_elimination_inplace(rows, A.cols)
+    rref_rows = all_rows
 
-    # Check for inconsistency
-    for row in rref_rows:
-        # If row is [0 0 ... 0 | 1], system is inconsistent
-        matrix_part = row & ((1 << A.cols) - 1)
-        augment_part = (row >> A.cols) & 1
+    # Any surviving row that is zero across the coefficients but 1 in the
+    # augment states 0 == 1: no solution.
+    coeff_mask = rhs_bit - 1
+    for row in rows:
+        if not (row & coeff_mask) and (row & rhs_bit):
+            return None
 
-        if matrix_part == 0 and augment_part == 1:
-            return None  # No solution
-
-    # Back substitution
+    # gaussian_elimination_inplace ran a full reduction, so pivot row i is
+    # e[pivot_col] plus free columns only: x[pivot_col] is simply its rhs bit.
+    # Free variables stay 0, which is a valid particular solution.
     solution = [0] * A.cols
-
-    # Set free variables to 0, solve for pivot variables
-    for i in reversed(range(len(pivot_cols))):
-        pivot_col = pivot_cols[i]
-        row = rref_rows[i]
-
-        # Extract equation: x[pivot_col] + sum of free variables = rhs
-        rhs = (row >> A.cols) & 1
-
-        # Sum contributions from variables to the right of pivot
-        sum_free = 0
-        for j in range(pivot_col + 1, A.cols):
-            if (row >> j) & 1:
-                sum_free ^= solution[j]
-
-        solution[pivot_col] = sum_free ^ rhs
+    for i, pivot_col in enumerate(pivot_cols):
+        solution[pivot_col] = 1 if rref_rows[i] & rhs_bit else 0
 
     return solution
 
@@ -88,8 +73,8 @@ def nullspace(A: SparseGF2Matrix | DenseGF2Matrix) -> list[list[int]]:
     Returns:
         List of basis vectors for null(A)
     """
-    # Convert to packed representation
-    rows = [A.get_row_bitwise(i) for i in range(A.rows)]
+    # Copy: gaussian_elimination_inplace mutates the list it is given.
+    rows = _rows_of(A)[:]
 
     # Gaussian elimination to find pivot columns
     rref_rows, pivot_cols = gaussian_elimination_inplace(rows, A.cols)
@@ -105,23 +90,17 @@ def nullspace(A: SparseGF2Matrix | DenseGF2Matrix) -> list[list[int]]:
     # Generate basis vectors
     basis = []
 
+    # In RREF each pivot row reads x[p_i] = sum over free columns f of R[i,f]*x[f].
+    # With exactly one free variable set to 1, that sum collapses to the single
+    # bit R[i, free_col] -- so the inner scan over every column to the right of
+    # the pivot was doing O(cols) work per pivot to recover one stored bit,
+    # making basis extraction O(free * pivots * cols) instead of O(free * pivots).
     for free_col in free_cols:
-        # Create basis vector with this free variable set to 1
         basis_vector = [0] * A.cols
         basis_vector[free_col] = 1
 
-        # Back substitution to find values of pivot variables
-        for i in reversed(range(len(pivot_cols))):
-            pivot_col = pivot_cols[i]
-            row = rref_rows[i]
-
-            # Sum contributions from free variables
-            sum_free = 0
-            for j in range(pivot_col + 1, A.cols):
-                if (row >> j) & 1:
-                    sum_free ^= basis_vector[j]
-
-            basis_vector[pivot_col] = sum_free
+        for i, pivot_col in enumerate(pivot_cols):
+            basis_vector[pivot_col] = (rref_rows[i] >> free_col) & 1
 
         basis.append(basis_vector)
 
@@ -136,14 +115,9 @@ def nullspace_bitwise(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[str, float]:
     Returns:
         (solution_string, computation_time)
     """
-    start_time = time.time()
+    start_time = time.perf_counter()
 
-    # OPTIMIZATION: Use cached packed rows if available (avoids conversion overhead)
-    if hasattr(A, "get_all_rows_bitwise"):
-        rows = A.get_all_rows_bitwise()[:]  # Copy to avoid modifying cache
-    else:
-        # Fallback: extract rows one by one
-        rows = [A.get_row_bitwise(i) for i in range(A.rows)]
+    rows = _rows_of(A)[:]  # copy: elimination mutates the list
 
     n = A.cols
     A_echelon, pivot_cols = _gaussian_elimination_GF2_bitwise(rows, n)
@@ -153,7 +127,7 @@ def nullspace_bitwise(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[str, float]:
     sol_bits = _unpack_vector(sol_int, n)
     sol_str = "".join(str(b) for b in sol_bits)
 
-    elapsed_time = time.time() - start_time
+    elapsed_time = time.perf_counter() - start_time
     return sol_str, elapsed_time
 
 
@@ -167,17 +141,27 @@ def nullspace_fast(matrix: list[list[int]], include_packing_time: bool = True) -
 
     Args:
         matrix: List of lists representing binary matrix (each row is a list of 0/1)
-        include_packing_time: If False, excludes row packing from timing (default True for fair comparison)
+        include_packing_time: If True (the default) the returned time covers
+            packing the input as well as the solve. Set False to time only the
+            elimination, e.g. when the caller already holds packed rows.
 
     Returns:
         (solution_string, computation_time)
+
+    Note:
+        The returned time is a convenience for interactive use. It is a single
+        untimed-warmup sample of ``time.perf_counter``; do not build a
+        benchmark on it -- use ``benchmarks/harness.py``, which warms up,
+        repeats, and reports the minimum.
     """
     n = len(matrix[0])
-    # Pack rows directly into integers
-    rows = [_pack_vector(row) for row in matrix]
 
-    # Start timing AFTER packing (to match simon_bitwise behavior)
-    start_time = time.time()
+    # The flag used to be accepted and then ignored: timing always started
+    # after packing, so every reported figure silently excluded it.
+    start_time = time.perf_counter()
+    rows = [_pack_vector(row) for row in matrix]
+    if not include_packing_time:
+        start_time = time.perf_counter()
 
     # Gaussian elimination
     A_echelon, pivot_cols = _gaussian_elimination_GF2_bitwise(rows, n)
@@ -189,74 +173,82 @@ def nullspace_fast(matrix: list[list[int]], include_packing_time: bool = True) -
     sol_bits = _unpack_vector(sol_int, n)
     sol_str = "".join(str(b) for b in sol_bits)
 
-    elapsed_time = time.time() - start_time
+    elapsed_time = time.perf_counter() - start_time
     return sol_str, elapsed_time
 
 
 def _pack_vector(vec):
-    """Pack list of bits into integer."""
-    out = 0
-    for i, bit in enumerate(vec):
-        out |= (bit & 1) << i
-    return out
+    """Pack list of bits into integer (bit i = vec[i])."""
+    # One int() over a reversed binary string beats a shift-and-OR loop, which
+    # reallocates the accumulating integer on every element.
+    if not vec:
+        return 0
+    return int("".join("1" if b & 1 else "0" for b in reversed(vec)), 2)
 
 
 def _unpack_vector(x, n):
     """Unpack integer into list of n bits."""
-    return [(x >> i) & 1 for i in range(n)]
+    if n <= 0:
+        return []
+    bits = format(x & ((1 << n) - 1), f"0{n}b")
+    return [int(c) for c in reversed(bits)]
 
 
 def _gaussian_elimination_GF2_bitwise(rows, n):
-    """Original optimized Gaussian elimination."""
+    """Forward elimination to row echelon form, tracking pivot columns."""
     A = rows[:]
+    n_rows = len(A)
     pivot_cols = []
     r = 0
+    bit = 1
 
     for col in range(n):
+        if r == n_rows:
+            break
+
+        # ``A[i] & bit`` rather than ``(A[i] >> col) & 1``: the shift builds a
+        # full-width copy of the row for every probe, the mask does not.
         pivot_row = None
-        for i in range(r, len(A)):
-            if (A[i] >> col) & 1:
+        for i in range(r, n_rows):
+            if A[i] & bit:
                 pivot_row = i
                 break
-        if pivot_row is None:
-            continue
 
-        A[r], A[pivot_row] = A[pivot_row], A[r]
-        pivot_cols.append(col)
+        if pivot_row is not None:
+            A[r], A[pivot_row] = A[pivot_row], A[r]
+            pivot_cols.append(col)
 
-        for i in range(r + 1, len(A)):
-            if (A[i] >> col) & 1:
-                A[i] ^= A[r]
-        r += 1
-        if r == len(A):
-            break
+            pivot = A[r]
+            for i in range(r + 1, n_rows):
+                if A[i] & bit:
+                    A[i] ^= pivot
+            r += 1
+
+        bit <<= 1
 
     return A, pivot_cols
 
 
 def _nullspace_solution_bitwise(rows, pivot_cols, n):
-    """Original optimized nullspace solution."""
-    all_cols = set(range(n))
-    free_cols = sorted(all_cols - set(pivot_cols))
+    """One non-trivial nullspace vector, as a packed integer.
+
+    Back-substitution is carried out on the packed vector directly: row i is
+    zero in every column left of its pivot and x has no bit set at the pivot
+    yet, so the whole "sum of already-known variables" term is the parity of
+    ``row & x`` -- a single masked popcount. The previous loop walked every
+    column right of each pivot, which made this O(pivots * cols) Python steps
+    with a full-width shift inside each one.
+    """
+    free_cols = sorted(set(range(n)) - set(pivot_cols))
 
     if not free_cols:
         raise ValueError("No free variable found; the system appears to be full rank.")
 
-    x = [0] * n
-    x[free_cols[0]] = 1
+    sol_int = 1 << free_cols[0]
 
-    num_pivots = len(pivot_cols)
-    for i in reversed(range(num_pivots)):
-        p = pivot_cols[i]
-        sum_free = 0
-        for j in range(p + 1, n):
-            if (rows[i] >> j) & 1:
-                sum_free ^= x[j]
-        x[p] = sum_free
-
-    sol_int = _pack_vector(x)
-    if sol_int == 0:
-        sol_int = 1 << free_cols[0]
+    for i in reversed(range(len(pivot_cols))):
+        if (rows[i] & sol_int).bit_count() & 1:
+            sol_int |= 1 << pivot_cols[i]
 
     return sol_int
 
@@ -274,41 +266,34 @@ def inverse(A: SparseGF2Matrix | DenseGF2Matrix) -> SparseGF2Matrix | None:
     n = A.rows
 
     # Create augmented matrix [A | I]
-    augmented_rows = []
-    for i in range(n):
-        row_a = A.get_row_bitwise(i)
-        row_identity = 1 << i  # Identity matrix row
-        # Combine: A on left, I on right
-        augmented = row_a | (row_identity << n)
-        augmented_rows.append(augmented)
+    augmented_rows = [row | (1 << (n + i)) for i, row in enumerate(_rows_of(A))]
 
-    # Gaussian elimination on augmented matrix
+    # Gauss-Jordan on the augmented matrix, probing with a mask rather than a
+    # shift so each test does not allocate a shifted copy of the whole row.
+    bit = 1
     for col in range(n):
-        # Find pivot
         pivot_row = None
         for i in range(col, n):
-            if (augmented_rows[i] >> col) & 1:
+            if augmented_rows[i] & bit:
                 pivot_row = i
                 break
 
         if pivot_row is None:
             return None  # Singular matrix
 
-        # Swap rows
         if pivot_row != col:
             augmented_rows[col], augmented_rows[pivot_row] = augmented_rows[pivot_row], augmented_rows[col]
 
-        # Eliminate
+        pivot = augmented_rows[col]
         for i in range(n):
-            if i != col and (augmented_rows[i] >> col) & 1:
-                augmented_rows[i] ^= augmented_rows[col]
+            if i != col and augmented_rows[i] & bit:
+                augmented_rows[i] ^= pivot
+
+        bit <<= 1
 
     # Extract inverse from right side of augmented matrix
-    inverse_rows = []
-    for i in range(n):
-        # Extract right half (columns n to 2n-1)
-        right_half = (augmented_rows[i] >> n) & ((1 << n) - 1)
-        inverse_rows.append(right_half)
+    mask = (1 << n) - 1
+    inverse_rows = [(row >> n) & mask for row in augmented_rows]
 
     # Create result matrix
     result = SparseGF2Matrix(n, n)
@@ -319,9 +304,20 @@ def inverse(A: SparseGF2Matrix | DenseGF2Matrix) -> SparseGF2Matrix | None:
 
 def least_squares(A: SparseGF2Matrix | DenseGF2Matrix, b: list[int] | np.ndarray) -> list[int] | None:
     """
-    Solve overdetermined system in least squares sense over GF(2).
+    Solve the GF(2) normal equations A^T A x = A^T b.
 
-    For GF(2), this reduces to solving A^T A x = A^T b.
+    Warning:
+        This is NOT a least-squares solver. Least squares needs an inner
+        product with a positive-definite norm; over GF(2) the bilinear form
+        x -> x^T x is degenerate (every even-weight vector is self-orthogonal),
+        so a solution of the normal equations does not minimise anything, and
+        the equations may be inconsistent even when a nearest vector exists.
+        Minimising Hamming distance to the column space is the nearest-codeword
+        problem, which is NP-hard.
+
+        Kept because the normal equations are still useful for consistent
+        overdetermined systems: when Ax = b has a solution, so does this.
+        Returns None when the normal equations are inconsistent.
     """
     from .core import multiply, transpose
 
@@ -331,15 +327,9 @@ def least_squares(A: SparseGF2Matrix | DenseGF2Matrix, b: list[int] | np.ndarray
     # Compute A^T * A
     ATA = multiply(AT, A)
 
-    # Compute A^T * b
-    ATb = []
-    for i in range(AT.rows):
-        row_packed = AT.get_row_bitwise(i)
-        dot_product = 0
-        for j in range(len(b)):
-            if (row_packed >> j) & 1:
-                dot_product ^= b[j]
-        ATb.append(dot_product)
+    # Compute A^T * b as a parity of overlaps rather than a shift per column.
+    b_packed = _pack_vector([int(v) & 1 for v in b])
+    ATb = [(row & b_packed).bit_count() & 1 for row in _rows_of(AT)]
 
     # Solve (A^T A) x = A^T b
     return solve(ATA, ATb)
@@ -366,17 +356,11 @@ def image(A: SparseGF2Matrix | DenseGF2Matrix) -> list[list[int]]:
     AT = transpose(A)
 
     # Find row echelon form
-    rows = [AT.get_row_bitwise(i) for i in range(AT.rows)]
+    rows = _rows_of(AT)[:]
     rref_rows, pivot_cols = gaussian_elimination_inplace(rows, AT.cols)
 
     # Convert back to column vectors
-    basis = []
-    for row_packed in rref_rows:
-        if row_packed != 0:  # Non-zero row
-            col_vector = [(row_packed >> i) & 1 for i in range(AT.cols)]
-            basis.append(col_vector)
-
-    return basis
+    return [_unpack_vector(row, AT.cols) for row in rref_rows if row]
 
 
 def rank_nullity_theorem(A: SparseGF2Matrix | DenseGF2Matrix) -> tuple[int, int, int]:
@@ -411,31 +395,26 @@ def solve_multiple_rhs(
     if A.rows != B.rows:
         raise ValueError("A and B must have same number of rows")
 
-    # Solve for each column of B
-    solution_columns = []
+    # Augment A with ALL of B's columns at once and eliminate a single time.
+    # Calling solve() per column repeated the whole O(n^3) elimination B.cols
+    # times over an unchanged coefficient matrix.
+    a_rows = _rows_of(A)
+    b_rows = _rows_of(B)
+    rows = [row | (b_rows[i] << A.cols) for i, row in enumerate(a_rows)]
 
-    for j in range(B.cols):
-        # Extract column j from B
-        b_col = []
-        for i in range(B.rows):
-            row_packed = B.get_row_bitwise(i)
-            b_col.append((row_packed >> j) & 1)
+    coeff_mask = (1 << A.cols) - 1
+    rref_rows, pivot_cols = gaussian_elimination_inplace(rows, A.cols)
 
-        # Solve Ax = b_col
-        x = solve(A, b_col)
-        if x is None:
-            return None  # No solution exists
+    # A row that is zero across the coefficients but non-zero in some augmented
+    # column means that column's system is inconsistent.
+    for row in rows:
+        if not (row & coeff_mask) and (row >> A.cols):
+            return None
 
-        solution_columns.append(x)
-
-    # Transpose to get result matrix
-    result_rows = []
-    for i in range(A.cols):
-        row_packed = 0
-        for j in range(B.cols):
-            if solution_columns[j][i]:
-                row_packed |= 1 << j
-        result_rows.append(row_packed)
+    # Free variables are 0, so each pivot variable equals its augmented row.
+    result_rows = [0] * A.cols
+    for i, pivot_col in enumerate(pivot_cols):
+        result_rows[pivot_col] = rref_rows[i] >> A.cols
 
     result = SparseGF2Matrix(A.cols, B.cols)
     result.set_from_packed_rows(result_rows)
@@ -503,19 +482,20 @@ def iterative_refinement(
     Returns:
         (solution, iterations_used)
     """
-    x = [0] * A.cols if x0 is None else x0[:]
+    x = [0] * A.cols if x0 is None else list(x0)
+    a_rows = _rows_of(A)
+    x_packed_width = A.cols
 
     for iteration in range(max_iterations):
-        # Compute residual r = b - Ax
-        residual = b[:]
+        # list(b) rather than b[:] -- slicing a NumPy array yields a *view*, so
+        # the old code XOR-ed the residual straight into the caller's array.
+        residual = [int(v) & 1 for v in b]
 
-        for i in range(A.rows):
-            row_packed = A.get_row_bitwise(i)
-            dot_product = 0
-            for j in range(A.cols):
-                if (row_packed >> j) & 1:
-                    dot_product ^= x[j]
-            residual[i] ^= dot_product
+        x_packed = _pack_vector(x[:x_packed_width])
+        for i, row_packed in enumerate(a_rows):
+            # A row dotted with x is the parity of their overlap: one masked
+            # popcount instead of a shift per column.
+            residual[i] ^= (row_packed & x_packed).bit_count() & 1
 
         # Check convergence
         if all(r == 0 for r in residual):
@@ -542,19 +522,23 @@ def benchmark_solver(
     Returns:
         Performance statistics
     """
+    solve(A, b)  # warm up: the first call pays for row-cache construction
+
     times = []
-
     for _ in range(num_trials):
-        start_time = time.time()
+        start_time = time.perf_counter()
         solve(A, b)
-        elapsed = time.time() - start_time
-        times.append(elapsed)
+        times.append(time.perf_counter() - start_time)
 
+    # min_time is the headline figure: for deterministic CPU work the minimum
+    # is the sample least contaminated by scheduler noise. mean/max are kept
+    # so a noisy run is visible rather than averaged away.
     return {
-        "mean_time": np.mean(times),
-        "std_time": np.std(times),
-        "min_time": np.min(times),
-        "max_time": np.max(times),
-        "total_time": np.sum(times),
+        "min_time": float(np.min(times)),
+        "median_time": float(np.median(times)),
+        "mean_time": float(np.mean(times)),
+        "std_time": float(np.std(times)),
+        "max_time": float(np.max(times)),
+        "total_time": float(np.sum(times)),
         "trials": num_trials,
     }

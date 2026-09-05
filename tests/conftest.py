@@ -1,5 +1,5 @@
 """
-Pytest configuration and fixtures for comprehensive binpy testing.
+Pytest configuration and fixtures for comprehensive gf2 testing.
 
 This module provides:
 - Matrix generation fixtures for various sizes and types
@@ -15,8 +15,8 @@ import hypothesis.strategies as st
 import pytest
 from hypothesis import settings
 
-from binpy.generators import identity, ones, random_sparse, zeros
-from binpy.sparse import SparseGF2Matrix
+from gf2.generators import identity, ones, random_sparse, zeros
+from gf2.sparse import SparseGF2Matrix
 
 # Configure hypothesis for property-based testing
 settings.register_profile("default", max_examples=50, deadline=5000)
