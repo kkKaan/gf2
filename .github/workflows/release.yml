@@ -1,0 +1,123 @@
+name: Release
+
+# Publishing is driven entirely by tags: pushing v1.2.3 publishes 1.2.3.
+# There is deliberately no workflow_dispatch trigger - a manual run would have
+# no tag to check the built version against, which is the one guard that stops
+# the wrong version reaching PyPI.
+on:
+  push:
+    tags:
+      - "v*"
+
+# Least privilege by default; each job below asks for exactly what it needs.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Tag must match the packaged version
+        # A PyPI release cannot be replaced, only yanked, so a mismatch between
+        # the tag and the version actually built has to fail here rather than
+        # be discovered afterwards. This exact mistake already happened once:
+        # v0.1.0 was tagged on a commit that was not the one published.
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          wheel=$(ls dist/*.whl)
+          built_version=$(basename "$wheel" | cut -d- -f2)
+          echo "tag=$tag_version built=$built_version"
+          if [ "$tag_version" != "$built_version" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match built version ${built_version}"
+            exit 1
+          fi
+
+      - name: Check distribution metadata
+        run: twine check --strict dist/*
+
+      - name: Install the wheel and run the test suite against it
+        # The tag may point at any commit, so passing CI on main is not
+        # evidence about this one. Publishing is irreversible; two minutes of
+        # tests is cheap insurance.
+        run: |
+          python -m venv /tmp/verify
+          /tmp/verify/bin/pip install "$(ls dist/*.whl)[test]"
+          /tmp/verify/bin/python -m pytest tests/ -q --override-ini="addopts="
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    # Bind this job to a GitHub environment so the repository can require a
+    # manual approval before anything is uploaded, and so the trusted-publisher
+    # configuration on PyPI can be scoped to it.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/gf2/
+    permissions:
+      # Mints the short-lived OIDC token that PyPI exchanges for upload rights.
+      # No API token is stored anywhere.
+      id-token: write
+    steps:
+      - name: Download the distributions built above
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish
+        # Pinned rather than tracking release/v1, for the same reason ruff and
+        # mypy are pinned: CI's behaviour should not change without a commit.
+        # Bump deliberately.
+        uses: pypa/gh-action-pypi-publish@v1.14.2
+        # Attestations (PEP 740) are produced automatically because this job
+        # has id-token: write.
+
+  github-release:
+    name: Attach artifacts to the GitHub release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" dist/* --repo "${GITHUB_REPOSITORY}" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" dist/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "${GITHUB_REF_NAME}" \
+              --notes "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)."
+          fi
