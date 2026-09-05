@@ -6,11 +6,6 @@ High-performance binary (GF(2)) matrix operations library for Python.
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **Renamed.** This project was called `binpy` until v0.1.0. The name now
-> belongs to an unrelated digital-logic package on PyPI, so the import root is
-> `gf2`: replace `import binpy` with `import gf2`. The public API is otherwise
-> unchanged.
-
 ## Installation
 
 ```bash
