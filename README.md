@@ -157,27 +157,89 @@ mypy gf2/           # Type checking
 pre-commit install
 ```
 
-## Simon's Algorithm Postprocessing
+## Example use cases
 
-gf2 provides fast GF(2) nullspace routines used in Simon-style workflows:
+GF(2) linear algebra is the classical half of several quantum and coding-theory
+workflows. Each example below is self-contained and runnable.
 
-- High-level basis: `gf2.nullspace(A)` returns a basis as a list of 0/1 lists
-- Fast bitwise single solution: `gf2.nullspace_bitwise(A)` -> `(solution_bits: str, seconds: float)`
-- Zero-overhead raw input: `gf2.nullspace_fast(matrix)` -> `(solution_bits: str, seconds: float)`
+### Recovering a hidden string from quantum measurements
 
-Example using `nullspace_fast` directly on list-of-lists:
+Simon's algorithm, and Bernstein-Vazirani-style problems generally, leave you
+with measurement outcomes `y` that satisfy `y · s = 0` over GF(2). The hidden
+string `s` is the null space of those measurements — it is almost never one of
+them, so it has to be solved for rather than searched for.
+
+```python
+from gf2 import SparseGF2Matrix, nullspace
+
+# Measurement outcomes from a Simon circuit with hidden string s = 11010.
+measurements = [
+    [0, 1, 1, 1, 0],
+    [0, 1, 0, 1, 1],
+    [0, 0, 1, 0, 0],
+    [1, 0, 1, 1, 1],
+]
+
+A = SparseGF2Matrix(len(measurements), 5, measurements)
+for candidate in nullspace(A):
+    print("".join(map(str, candidate)))  # -> 11010
+```
+
+For a single vector with no wrapper overhead — the hot path when you are
+looping over many circuit runs — use `nullspace_fast`, which takes a plain list
+of lists:
 
 ```python
 from gf2 import nullspace_fast
 
-matrix = [
-    [1, 0, 1, 0, 1],
-    [0, 1, 1, 0, 0],
-    [1, 1, 0, 1, 0],  # use n-1 rows for underdetermined system
-]
-
-solution_bits, elapsed = nullspace_fast(matrix)
-print(solution_bits, elapsed)
+bits, seconds = nullspace_fast(measurements)
+print(bits)  # -> 11010
 ```
 
-This returns a nontrivial nullspace vector as a binary string and the elapsed time, matching usage patterns in Simon postprocessing scripts.
+### Testing decodability in linear network coding
+
+A receiver can decode once the coding vectors it has collected are linearly
+independent **over GF(2)**. Rank over the reals is a different quantity and
+disagrees on roughly 9% of random binary matrices, so it cannot stand in here.
+
+```python
+from gf2 import SparseGF2Matrix, rank
+
+coding_vectors = [
+    [1, 1, 0],
+    [0, 1, 1],
+    [1, 0, 1],  # equals the XOR of the other two
+]
+
+A = SparseGF2Matrix(3, 3, coding_vectors)
+print(rank(A))  # 2 -- rank-deficient, not yet decodable
+print(rank(A) == len(coding_vectors))  # False
+```
+
+### Syndrome decoding for a linear code
+
+```python
+from gf2 import hamming_matrix, multiply, SparseGF2Matrix
+
+H = hamming_matrix(3)  # [7,4] Hamming parity check, 3x7
+received = [[1], [0], [1], [1], [0], [0], [1]]
+
+syndrome = multiply(H, SparseGF2Matrix(7, 1, received))
+print(syndrome.to_dense())  # non-zero syndrome locates the error
+```
+
+### Building quantum error-correcting codes
+
+`hypergraph_product` and `surface_code_matrix` satisfy the CSS commutation
+condition `H_x @ H_z.T == 0` exactly, by construction:
+
+```python
+from gf2 import surface_code_matrix, multiply, transpose, rank
+
+H_x, H_z = surface_code_matrix(distance=5)
+n = H_x.cols
+
+commutes = not any(multiply(H_x, transpose(H_z)).get_all_rows_bitwise())
+k = n - rank(H_x) - rank(H_z)
+print(n, k, commutes)  # 41 1 True
+```
